@@ -11,6 +11,8 @@
 
     <Window.Resources>
         <conv:EqualsToBoolConverter x:Key="EqualsToBool" />
+        <conv:BoolToBrushConverter x:Key="BoolToBrush" />
+        <conv:BoolToStatusConverter x:Key="BoolToStatus" />
     </Window.Resources>
     <Window.DataContext>
         <vm:LinkViewModel />
@@ -332,6 +334,56 @@
                             </TextBlock>
                         </Grid>
                     </GroupBox>
+
+                    <!-- DEM tiles scan -->
+                    <GroupBox Header="DEM tiles"
+                              Margin="0,8,0,0">
+                        <DockPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        DockPanel.Dock="Top"
+                                        Margin="8">
+                                <Button Content="Scan required tiles"
+                                        Click="ScanDemTiles_Click" />
+                                <TextBlock Text=" "
+                                           Width="12" />
+                                <TextBlock Text="{Binding DemScanSummary}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                            <ListView ItemsSource="{Binding DemScan}"
+                                      Margin="8"
+                                      Height="140">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Tile"
+                                                        DisplayMemberBinding="{Binding Name}"
+                                                        Width="80" />
+                                        <GridViewColumn Header="Status"
+                                                        Width="90">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Ellipse Width="10"
+                                                                 Height="10"
+                                                                 Fill="{Binding Exists, Converter={StaticResource BoolToBrush}}"
+                                                                 Stroke="#666"
+                                                                 StrokeThickness="0.5" />
+                                                        <TextBlock Text=" "
+                                                                   Width="6" />
+                                                        <TextBlock Text="{Binding Exists, Converter={StaticResource BoolToStatus}}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Path"
+                                                        DisplayMemberBinding="{Binding FullPath}"
+                                                        Width="400" />
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </DockPanel>
+                    </GroupBox>
+
+
                 </StackPanel>
             </ScrollViewer>
         </Border>

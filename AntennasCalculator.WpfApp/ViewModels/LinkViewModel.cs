@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Collections.ObjectModel;
 using Fresnel.Core.Antennas;
+using System.Linq;
 
 namespace AntennasCalculator.WpfApp.ViewModels;
 
@@ -22,14 +23,26 @@ public sealed class LinkViewModel : INotifyPropertyChanged
 	private double _minClearancePctActual = 0;
 	private AntennaSpec? _selectedAp;
 	private AntennaSpec? _selectedSta;
-
+	public ObservableCollection<DemTileStatus> DemScan { get; } = new();
+	private string _demScanSummary = string.Empty;
 
 	public double FreqGHz
 	{
 		get => _freqGHz;
 		set { if (_freqGHz != value) { _freqGHz = value; OnPropertyChanged(); } }
 	}
+	public string DemScanSummary
+	{
+		get => _demScanSummary;
+		set { if (_demScanSummary != value) { _demScanSummary = value; OnPropertyChanged(); } }
+	}
 
+	public void UpdateDemScanSummary()
+	{
+		if (DemScan.Count == 0) { DemScanSummary = ""; return; }
+		var ok = DemScan.Count(t => t.Exists);
+		DemScanSummary = $"Tiles: {DemScan.Count}, present: {ok}, missing: {DemScan.Count - ok}";
+	}
 	public string ProfileMode
 	{
 		get => _profileMode;

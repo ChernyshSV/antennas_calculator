@@ -20,6 +20,8 @@ using System.Windows.Navigation;
 using AntennasCalculator.WpfApp.Models;
 using AntennasCalculator.WpfApp.Services;
 using Fresnel.Core.Dem;
+using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 
 namespace AntennasCalculator.WpfApp
 {
@@ -417,6 +419,96 @@ namespace AntennasCalculator.WpfApp
 			LosDot.Fill = brush;
 		}
 
+		private static string TileName(int latFloor, int lonFloor)
+		{
+			char ns = latFloor >= 0 ? 'N' : 'S';
+			char ew = lonFloor >= 0 ? 'E' : 'W';
+			int alat = Math.Abs(latFloor);
+			int alon = Math.Abs(lonFloor);
+			return $"{ns}{alat:00}{ew}{alon:000}";
+		}
 
+		private IEnumerable<string> TilesForSegment((double lat, double lon) a, (double lat, double lon) b, int margin = 0)
+		{
+			// basic bbox-based coverage; not handling dateline wrap (assume short links)
+			double minLat = Math.Min(a.lat, b.lat);
+			double maxLat = Math.Max(a.lat, b.lat);
+			double minLon = Math.Min(a.lon, b.lon);
+			double maxLon = Math.Max(a.lon, b.lon);
+			int latStart = (int)Math.Floor(minLat) - margin;
+			int latEnd = (int)Math.Floor(maxLat) + margin;
+			int lonStart = (int)Math.Floor(minLon) - margin;
+			int lonEnd = (int)Math.Floor(maxLon) + margin;
+			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			for (int lat = latStart; lat <= latEnd; lat++)
+				for (int lon = lonStart; lon <= lonEnd; lon++)
+					set.Add(TileName(lat, lon));
+			return set.OrderBy(s => s);
+		}
+
+		private IEnumerable<string> TilesAround((double lat, double lon) c, int radius = 1)
+		{
+			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			int lat0 = (int)Math.Floor(c.lat);
+			int lon0 = (int)Math.Floor(c.lon);
+			for (int dy = -radius; dy <= radius; dy++)
+				for (int dx = -radius; dx <= radius; dx++)
+					set.Add(TileName(lat0 + dy, lon0 + dx));
+			return set.OrderBy(s => s);
+		}
+
+		private void ScanDemTiles_Click(object sender, RoutedEventArgs e)
+		{
+			var vm = Vm;
+			if (string.IsNullOrWhiteSpace(vm.DemFolder) || !Directory.Exists(vm.DemFolder))
+			{
+				MessageBox.Show("Задайте коректний DEM Folder (теку з .hgt файлами).");
+				return;
+			}
+
+			IEnumerable<string> required;
+			if (_p1 is not null && _p2 is not null)
+			{
+				required = TilesForSegment((_p1.LatitudeDeg, _p1.LongitudeDeg),
+										   (_p2.LatitudeDeg, _p2.LongitudeDeg),
+										   margin: 0);
+			}
+			else
+			{
+				var viewport = MapCtrl.Map.Navigator.Viewport;
+				
+				var lonlat = SphericalMercator.ToLonLat(viewport.CenterX, viewport.CenterY);
+
+				required = TilesAround((lonlat.lat, lonlat.lon), radius: 1);
+			}
+
+			vm.DemScan.Clear();
+			foreach (var name in required)
+			{
+				string path = Path.Combine(vm.DemFolder, name + ".hgt");
+				bool exists = File.Exists(path);
+				if (!exists)
+				{
+					// Try lowercase/uppercase variants (Windows ignores, but just in case cross-platform)
+					var alt = Directory.GetFiles(vm.DemFolder, name + ".hgt", SearchOption.TopDirectoryOnly)
+						.Concat(Directory.GetFiles(vm.DemFolder, name + ".HGT", SearchOption.TopDirectoryOnly))
+						.FirstOrDefault();
+					if (!string.IsNullOrEmpty(alt)) { path = alt; exists = true; }
+				}
+				vm.DemScan.Add(new DemTileStatus(name, exists, exists ? path : null));
+			}
+			vm.UpdateDemScanSummary();
+
+			// Quick hint if something is missing
+			var missing = vm.DemScan.Where(t => !t.Exists).Select(t => t.Name).ToList();
+			if (missing.Count > 0)
+			{
+				StatusText.Text = $"Missing DEM tiles: {string.Join(", ", missing)}";
+			}
+			else
+			{
+				StatusText.Text = "All required DEM tiles are present.";
+			}
+		}
 	}
 }
