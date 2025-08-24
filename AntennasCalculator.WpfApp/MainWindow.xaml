@@ -3,10 +3,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AntennasCalculator.WpfApp.ViewModels"
         xmlns:m="clr-namespace:Mapsui.UI.Wpf;assembly=Mapsui.UI.Wpf"
+        xmlns:c="clr-namespace:AntennasCalculator.WpfApp.Controls"
+        xmlns:conv="clr-namespace:AntennasCalculator.WpfApp.Converters"
         Title="Antennas Calculator"
         Height="720"
         Width="1100">
 
+    <Window.Resources>
+        <conv:EqualsToBoolConverter x:Key="EqualsToBool" />
+    </Window.Resources>
     <Window.DataContext>
         <vm:LinkViewModel />
     </Window.DataContext>
@@ -25,9 +30,20 @@
         <Border Grid.Row="0"
                 BorderBrush="#DDD"
                 BorderThickness="0,0,0,1">
-            <Grid>
-                <m:MapControl x:Name="MapCtrl" />
-            </Grid>
+            <TabControl x:Name="TopTabs"
+                        Margin="0"
+                        Padding="0">
+                <TabItem Header="Map">
+                    <Grid>
+                        <m:MapControl x:Name="MapCtrl" />
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Profile">
+                    <Grid>
+                        <c:ProfileView x:Name="Profile" />
+                    </Grid>
+                </TabItem>
+            </TabControl>
         </Border>
 
         <!-- SPLITTER -->
@@ -55,18 +71,22 @@
                                      Margin="8,0,0,0">
                             <RadioButton Content="900 MHz"
                                          GroupName="BandGroup"
-                                         IsChecked="{Binding Band, ConverterParameter=900 MHz}" />
+                                         IsChecked="{Binding Band, Converter={StaticResource EqualsToBool}, ConverterParameter='900 MHz'}" />
                             <RadioButton Content="2.4 GHz"
-                                         GroupName="BandGroup" />
+                                         GroupName="BandGroup"
+                                         IsChecked="{Binding Band, Converter={StaticResource EqualsToBool}, ConverterParameter='2.4 GHz'}" />
                             <RadioButton Content="3 GHz"
-                                         GroupName="BandGroup" />
+                                         GroupName="BandGroup"
+                                         IsChecked="{Binding Band, Converter={StaticResource EqualsToBool}, ConverterParameter='3 GHz'}" />
                             <RadioButton Content="4 GHz"
-                                         GroupName="BandGroup" />
+                                         GroupName="BandGroup"
+                                         IsChecked="{Binding Band, Converter={StaticResource EqualsToBool}, ConverterParameter='4 GHz'}" />
                             <RadioButton Content="5 GHz"
                                          GroupName="BandGroup"
-                                         IsChecked="True" />
+                                         IsChecked="{Binding Band, Converter={StaticResource EqualsToBool}, ConverterParameter='5 GHz'}" />
                             <RadioButton Content="11 GHz"
-                                         GroupName="BandGroup" />
+                                         GroupName="BandGroup"
+                                         IsChecked="{Binding Band, Converter={StaticResource EqualsToBool}, ConverterParameter='11 GHz'}" />
                         </UniformGrid>
                     </StackPanel>
 
@@ -101,15 +121,20 @@
                         <UniformGrid Columns="5"
                                      Margin="8,0,0,0">
                             <RadioButton Content="AirFiber"
-                                         IsChecked="{Binding Technology, ConverterParameter=AirFiber}" />
+                                         GroupName="TechGroup"
+                                         IsChecked="{Binding Technology, Converter={StaticResource EqualsToBool}, ConverterParameter='AirFiber'}" />
                             <RadioButton Content="AirFiber X"
-                                         IsChecked="{Binding Technology, ConverterParameter=AirFiber X}" />
+                                         GroupName="TechGroup"
+                                         IsChecked="{Binding Technology, Converter={StaticResource EqualsToBool}, ConverterParameter='AirFiber X'}" />
                             <RadioButton Content="AirFiber FX"
-                                         IsChecked="{Binding Technology, ConverterParameter=AirFiber FX}" />
+                                         GroupName="TechGroup"
+                                         IsChecked="{Binding Technology, Converter={StaticResource EqualsToBool}, ConverterParameter='AirFiber FX'}" />
                             <RadioButton Content="AirMax"
-                                         IsChecked="{Binding Technology, ConverterParameter=AirMax}" />
+                                         GroupName="TechGroup"
+                                         IsChecked="{Binding Technology, Converter={StaticResource EqualsToBool}, ConverterParameter='AirMax'}" />
                             <RadioButton Content="AirMax AC"
-                                         IsChecked="{Binding Technology, ConverterParameter=AirMax AC}" />
+                                         GroupName="TechGroup"
+                                         IsChecked="{Binding Technology, Converter={StaticResource EqualsToBool}, ConverterParameter='AirMax AC'}" />
                         </UniformGrid>
                     </StackPanel>
 
@@ -136,29 +161,77 @@
                             <TextBlock Text="Access Point Gain:"
                                        Width="140"
                                        VerticalAlignment="Center" />
-                            <ComboBox Width="120"
-                                      SelectedValue="{Binding ApGainDbi}">
-                                <ComboBoxItem Content="16 dBi" />
-                                <ComboBoxItem Content="23 dBi" />
-                                <ComboBoxItem Content="30 dBi" />
+                            <ComboBox Width="260"
+                                      ItemsSource="{Binding AntennaCatalog}"
+                                      SelectedItem="{Binding SelectedApAntenna}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                   <Run Text="{Binding Brand}" />
+                                   <Run Text=" " />
+                                   <Run Text="{Binding Model}" />
+                                   <Run Text=" (" />
+                                   <Run Text="{Binding Gain_dBi}" />
+                                   <Run Text=" dBi)" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
                             </ComboBox>
+                            <TextBlock Text=" → "
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ApGainDbi}"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text=" dBi"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Station Gain:"
                                        Width="140"
                                        VerticalAlignment="Center" />
-                            <ComboBox Width="120"
-                                      SelectedValue="{Binding StaGainDbi}">
-                                <ComboBoxItem Content="16 dBi" />
-                                <ComboBoxItem Content="23 dBi" />
-                                <ComboBoxItem Content="30 dBi" />
+                            <ComboBox Width="260"
+                                      ItemsSource="{Binding AntennaCatalog}"
+                                      SelectedItem="{Binding SelectedStaAntenna}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                   <Run Text="{Binding Brand}" />
+                                   <Run Text=" " />
+                                   <Run Text="{Binding Model}" />
+                                   <Run Text=" (" />
+                                   <Run Text="{Binding Gain_dBi}" />
+                                   <Run Text=" dBi)" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
                             </ComboBox>
+                            <TextBlock Text=" → "
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding StaGainDbi}"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text=" dBi"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
                     </UniformGrid>
 
                     <!-- Status line -->
-                    <TextBlock x:Name="StatusText"
-                               Margin="0,4,0,0" />
+                    <DockPanel Margin="0,4,0,0">
+                        <StackPanel Orientation="Horizontal"
+                                    DockPanel.Dock="Left"
+                                    VerticalAlignment="Center">
+                            <Ellipse x:Name="LosDot"
+                                     Width="12"
+                                     Height="12"
+                                     Margin="0,0,6,0"
+                                     Fill="Gray"
+                                     Stroke="#666"
+                                     StrokeThickness="0.5" />
+                            <TextBlock x:Name="LosText"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="StatusText"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
                 </StackPanel>
             </ScrollViewer>
         </Border>

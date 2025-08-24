@@ -1,4 +1,7 @@
 using System.Windows;
+using System.IO;
+using Fresnel.Core.Antennas;
+using System.Linq;
 using Fresnel.Core;
 using Mapsui;
 using Mapsui.Extensions;
@@ -11,6 +14,7 @@ using Mapsui.Widgets.ScaleBar;
 using NetTopologySuite.Geometries;
 using Point = NetTopologySuite.Geometries.Point;
 using AntennasCalculator.WpfApp.ViewModels;
+using AntennasCalculator.WpfApp.Controls;
 
 namespace AntennasCalculator.WpfApp
 {
@@ -45,7 +49,36 @@ namespace AntennasCalculator.WpfApp
 			MapCtrl.Info += MapCtrl_Info;
 
 			StatusText.Text = "Виберіть 2 точки кліком на мапі.";
+
+			// Load antenna catalog if available
+			TryLoadAntennaCatalog();
 		}
+
+		private void TryLoadAntennaCatalog()
+		{
+			var vm = Vm;
+			string[] candidates = new[] {
+					  System.IO.Path.Combine(AppContext.BaseDirectory, "Antennas", "antenna_catalog.json"),
+					  System.IO.Path.Combine(AppContext.BaseDirectory, "..","..","..","Fresnel.Core","Antennas","antenna_catalog.json"),
+					  System.IO.Path.Combine(AppContext.BaseDirectory, "..","..","..","..","Fresnel.Core","Antennas","antenna_catalog.json")
+				  };
+			string? path = candidates.FirstOrDefault(File.Exists);
+			if (path is null) return;
+			try
+			{
+				var list = AntennaCatalog.LoadFromJson(path);
+				vm.AntennaCatalog.Clear();
+				foreach (var it in list) vm.AntennaCatalog.Add(it);
+				// Preselect two commonly used ones if found
+				vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a => a.Brand.Contains("MikroTik", System.StringComparison.OrdinalIgnoreCase)) ?? vm.AntennaCatalog.FirstOrDefault();
+				vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a => a.Brand.Contains("Ubiquiti", System.StringComparison.OrdinalIgnoreCase)) ?? vm.AntennaCatalog.FirstOrDefault();
+			}
+			catch
+			{
+				// ignore load errors silently (non-breaking demo)
+			}
+		}
+
 
 		private void MapCtrl_Info(object? sender, Mapsui.MapInfoEventArgs e)
 		{
@@ -125,6 +158,9 @@ namespace AntennasCalculator.WpfApp
 
 			var coords = new List<Coordinate>(samples * 2 + 2);
 
+			var profile = new List<(double x, double r)>(samples + 1);
+			double totalMeters = dist;
+
 			for (int i = 0; i <= samples; i++)
 			{
 				var t = i / (double)samples;
@@ -133,6 +169,7 @@ namespace AntennasCalculator.WpfApp
 				var d2 = dist - d1;
 				var r1 = _fresnel.Radius1(freqHz, d1, d2);
 				var radius = r1 * (clearancePct / 100.0);
+				profile.Add((d1, r1));
 
 				var world = SphericalMercator.FromLonLat(g.LongitudeDeg, g.LatitudeDeg);
 				var meterScale = Math.Cos(g.LatitudeDeg * Math.PI / 180.0);
@@ -171,6 +208,40 @@ namespace AntennasCalculator.WpfApp
 
 			StatusText.Text = $"D≈{dist / 1000:0.###} km, f={fGHz:0.###} GHz, clearance={clearancePct:0.#}%";
 			MapCtrl.RefreshGraphics();
+
+			// Update profile view (if user switches to the tab)
+			Profile?.SetData(profile, clearancePct, totalMeters);
+			TopTabs.SelectedIndex = 1; // switch to Profile tab for immediate feedback
+									   // LOS / clearance indicator (stubbed: no terrain => theoretical check only)
+			UpdateLosIndicator(clearancePct);
+		}
+
+		private void UpdateLosIndicator(double targetClearancePct)
+		{
+			// With DEM disabled we assume the path is unobstructed and evaluate only the target.
+			// Policy:
+			//  - OK:    target >= 60%
+			//  - Warn:  40%..60%
+			//  - Bad:   < 40%
+			string text;
+			System.Windows.Media.Brush brush;
+			if (targetClearancePct >= 60)
+			{
+				text = $"LOS OK (target ≥60%)";
+				brush = System.Windows.Media.Brushes.LimeGreen;
+			}
+			else if (targetClearancePct >= 40)
+			{
+				text = "Marginal clearance (target <60%)";
+				brush = System.Windows.Media.Brushes.Orange;
+			}
+			else
+			{
+				text = "Insufficient clearance (target <40%)";
+				brush = System.Windows.Media.Brushes.IndianRed;
+			}
+			LosText.Text = text;
+			LosDot.Fill = brush;
 		}
 	}
 }
