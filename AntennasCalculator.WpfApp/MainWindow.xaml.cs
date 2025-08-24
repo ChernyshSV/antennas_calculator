@@ -238,9 +238,13 @@ namespace AntennasCalculator.WpfApp
 			var profile = new List<(double x, double r)>(samples + 1);
 			double totalMeters = dist;
 
-			var terrain = new List<(double x, double z)>(samples + 1);
+			var terrain = new List<(double x, double z)>(samples + 1); // aligned with profile
 			var vm = Vm;
 			IDemProvider dem = string.IsNullOrWhiteSpace(vm.DemFolder) ? new FlatDemProvider() : new HgtDemProvider(vm.DemFolder);
+
+			// Endpoint ground elevations and antenna heights
+			var groundA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg);
+			var groundB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg);
 
 			for (int i = 0; i <= samples; i++)
 			{
@@ -255,11 +259,11 @@ namespace AntennasCalculator.WpfApp
 
 				// Terrain elevation and straight-line LOS height
 				var ground = dem.GetElevation(g.LatitudeDeg, g.LongitudeDeg);
-				terrain.Add((d1, ground));
+				terrain.Add((d1, ground));// aligned index == i
 
 				// LOS linear interpolation between endpoint antenna heights above sea level
-				var groundA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg);
-				var groundB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg);
+				//var groundA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg);
+				//var groundB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg);
 
 				var world = SphericalMercator.FromLonLat(g.LongitudeDeg, g.LatitudeDeg);
 				var meterScale = Math.Cos(g.LatitudeDeg * Math.PI / 180.0);
@@ -271,8 +275,8 @@ namespace AntennasCalculator.WpfApp
 				var t = i / (double)samples;
 				var g = GeoUtils.Lerp(_p1, _p2, t);
 
-				var ground = dem.GetElevation(g.LatitudeDeg, g.LongitudeDeg);
-				terrain.Add((dist - dist * t, ground)); // reversed x for closing polygon not needed but collected
+				//var ground = dem.GetElevation(g.LatitudeDeg, g.LongitudeDeg);
+				//terrain.Add((dist - dist * t, ground)); // reversed x for closing polygon not needed but collected
 
 				var d1 = dist * t;
 				var d2 = dist - d1;
@@ -304,15 +308,18 @@ namespace AntennasCalculator.WpfApp
 			MapCtrl.RefreshGraphics();
 
 			// Update profile view (if user switches to the tab)
-			Profile?.SetDataWithTerrain(profile, clearancePct, totalMeters, terrain);
+			var zA = groundA + vm.ApHeightM;
+			var zB = groundB + vm.StaHeightM;
+			Profile?.SetDataWithTerrain(profile, clearancePct, totalMeters, terrain, zA, zB);
 			TopTabs.SelectedIndex = 1; // switch to Profile tab for immediate feedback
 									   // LOS / clearance indicator (stubbed: no terrain => theoretical check only)
 			UpdateLosIndicator(clearancePct);
 
 			// Compute actual min clearance along the path using terrain
 			// Compute LOS height at endpoints:
-			var zA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg) + vm.ApHeightM;
-			var zB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg) + vm.StaHeightM;
+			//var zA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg) + vm.ApHeightM;
+			//var zB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg) + vm.StaHeightM;
+			// (reuse zA, zB)
 			double minPct = double.PositiveInfinity;
 			for (int i = 0; i <= samples; i++)
 			{
