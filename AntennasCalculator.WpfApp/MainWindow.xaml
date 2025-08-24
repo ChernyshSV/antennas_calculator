@@ -40,7 +40,8 @@
                 </TabItem>
                 <TabItem Header="Profile">
                     <Grid>
-                        <c:ProfileView x:Name="Profile" />
+                        <c:ProfileView x:Name="Profile"
+                                       ProfileMode="{Binding ProfileMode}" />
                     </Grid>
                 </TabItem>
             </TabControl>
@@ -184,6 +185,22 @@
                                      ToolTip="Path with SRTM .hgt tiles (e.g., N50E030.hgt)" />
                         </StackPanel>
                     </UniformGrid>
+                    <!-- Row 4.6: Profile mode switch -->
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,0,0,8">
+                        <TextBlock Text="Profile Mode:"
+                                   Width="90"
+                                   VerticalAlignment="Center" />
+                        <ComboBox Width="140"
+                                  SelectedValue="{Binding ProfileMode}">
+                            <ComboBoxItem Content="Precise" />
+                            <ComboBoxItem Content="Coarse" />
+                        </ComboBox>
+                        <TextBlock Text="(Precise = fill between terrain and required)"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="#666" />
+                    </StackPanel>
                     <!-- Row 5: Antenna gains -->
                     <UniformGrid Columns="2"
                                  Margin="0,0,0,8">

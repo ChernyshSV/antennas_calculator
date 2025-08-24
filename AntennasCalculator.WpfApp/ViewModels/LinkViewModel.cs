@@ -15,6 +15,7 @@ public sealed class LinkViewModel : INotifyPropertyChanged
 	private int _channelWidthMHz = 40;
 	private int _apGainDbi = 16;
 	private int _staGainDbi = 16;
+	private string _profileMode = "Precise"; // "Precise" or "Coarse"
 	private double _apHeightM = 10;
 	private double _staHeightM = 10;
 	private string _demFolder = string.Empty;
@@ -27,6 +28,15 @@ public sealed class LinkViewModel : INotifyPropertyChanged
 	{
 		get => _freqGHz;
 		set { if (_freqGHz != value) { _freqGHz = value; OnPropertyChanged(); } }
+	}
+
+	public string ProfileMode
+	{
+		get => _profileMode;
+		set
+		{
+			if (_profileMode != value) { _profileMode = value; OnPropertyChanged(); }
+		}
 	}
 
 	public double ApHeightM

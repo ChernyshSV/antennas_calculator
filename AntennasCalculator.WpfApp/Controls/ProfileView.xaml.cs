@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Linq;
-using System.Windows.Documents;
 
 namespace AntennasCalculator.WpfApp.Controls;
 
@@ -19,12 +20,37 @@ public partial class ProfileView : UserControl
 	private (double zA, double zB) _losEndZ = (0, 0);
 	private double _clearancePct = 60.0;
 	private double _totalMeters = 0.0;
+	private Line? _cursor;
+	private ToolTip? _tooltip;
+
+	public static readonly DependencyProperty ProfileModeProperty =
+		DependencyProperty.Register(nameof(ProfileMode), typeof(string), typeof(ProfileView),
+			new PropertyMetadata("Precise", (s, e) => ((ProfileView)s).Redraw()));
+
+	/// <summary>"Precise" or "Coarse"</summary>
+	public string ProfileMode
+	{
+		get => (string)GetValue(ProfileModeProperty);
+		set => SetValue(ProfileModeProperty, value);
+	}
 
 	public ProfileView()
 	{
 		InitializeComponent();
 		SizeChanged += (_, __) => Redraw();
 		Loaded += (_, __) => Redraw();
+
+		Canvas.Loaded += (_, __) =>
+		{
+			_tooltip = new ToolTip { Placement = PlacementMode.Mouse, StaysOpen = false };
+			Canvas.ToolTip = _tooltip;
+		};
+		Canvas.MouseMove += Canvas_MouseMove;
+		Canvas.MouseLeave += (_, __) =>
+		{
+			if (_cursor != null) _cursor.Visibility = Visibility.Collapsed;
+			if (_tooltip != null) _tooltip.IsOpen = false;
+		};
 	}
 
 	/// <summary>
@@ -69,7 +95,9 @@ public partial class ProfileView : UserControl
 
 		double yMid = h * 0.5;
 
-		bool drawPrecise = _hasPrecise && _terrain.Count == _samples.Count;
+		//bool drawPrecise = _hasPrecise && _terrain.Count == _samples.Count;
+		bool drawPrecise = string.Equals(ProfileMode, "Precise", StringComparison.OrdinalIgnoreCase)
+						   && _hasPrecise && _terrain.Count == _samples.Count;
 
 		if (_samples.Count < 2)
 		{
@@ -248,6 +276,59 @@ public partial class ProfileView : UserControl
 
 		Title.Text = "Fresnel Profile";
 		Subtitle.Text = $"Max R1≈{_samples.Max(s => s.r):0.##} m, clearance={_clearancePct:0.#}%";
+	}
+
+	private void Canvas_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+	{
+		if (_samples.Count < 2) return;
+		var pt = e.GetPosition(Canvas);
+		double w = Math.Max(1, Canvas.ActualWidth);
+		double h = Math.Max(1, Canvas.ActualHeight);
+		double xMeters = Math.Clamp(pt.X / w, 0, 1) * _totalMeters;
+
+		// find segment
+		int n = _samples.Count;
+		int i1 = _samples.FindIndex(s => s.x >= xMeters);
+		if (i1 <= 0) i1 = 1;
+		if (i1 >= n) i1 = n - 1;
+		int i0 = i1 - 1;
+		var x0 = _samples[i0].x; var x1 = _samples[i1].x;
+		double frac = x1 > x0 ? (xMeters - x0) / (x1 - x0) : 0;
+
+		// interpolate values
+		double r = _samples[i0].r * (1 - frac) + _samples[i1].r * frac;
+		double t = xMeters / Math.Max(1, _totalMeters);
+		double zlos = _losEndZ.zA + (_losEndZ.zB - _losEndZ.zA) * t;
+		double zt = 0;
+		if (_terrain.Count == _samples.Count)
+		{
+			var z0 = _terrain[i0].z; var z1t = _terrain[i1].z;
+			zt = z0 * (1 - frac) + z1t * frac;
+		}
+		double zr = zlos - (_clearancePct / 100.0) * r;
+		double clearanceM = zlos - zt;
+		double pct = r > 1e-6 ? (clearanceM / r) * 100.0 : 0;
+
+		// update cursor
+		if (_cursor == null)
+		{
+			_cursor = new Line { Stroke = Brushes.Gray, StrokeThickness = 1, StrokeDashArray = new DoubleCollection { 2, 2 } };
+			Canvas.Children.Add(_cursor);
+		}
+		_cursor.Visibility = Visibility.Visible;
+		_cursor.X1 = pt.X; _cursor.X2 = pt.X; _cursor.Y1 = 0; _cursor.Y2 = h;
+
+		// update tooltip
+		if (_tooltip != null)
+		{
+			_tooltip.Content = $"d = {xMeters / 1000:0.###} km\n" +
+							   $"R1 = {r:0.##} m\n" +
+							   $"LOS = {zlos:0.#} m\n" +
+							   $"Terrain = {zt:0.#} m\n" +
+							   $"Required z = {zr:0.#} m\n" +
+							   $"Clearance = {clearanceM:0.#} m ({pct:0.#}%)";
+			_tooltip.IsOpen = true;
+		}
 	}
 
 	private void DrawAxes(double w, double h)
