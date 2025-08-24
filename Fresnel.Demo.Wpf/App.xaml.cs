@@ -1,1 +1,5 @@
-using System.Windows; namespace Fresnel.Demo.Wpf; public partial class App : Application { }
+using System.Windows;
+namespace AntennasCalculator.WpfApp
+{
+	public partial class App : Application { }
+}
