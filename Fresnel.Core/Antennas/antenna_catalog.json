@@ -1,9 +1,93 @@
 [
-  { "brand":"MikroTik","model":"mANT30 PA","code":"MTAD-5G-30D3-PA","type":"parabolic","band":"5 GHz","gain_dBi":30.0,"beamwidth_deg_az":5.0,"beamwidth_deg_el":5.0,"polarization":"dual-linear 
-  { "brand":"MikroTik","model":"LHG 5","code":"RBLHG-5nD","type":"grid-dish CPE","band":"5 
-  { "brand":"MikroTik","model":"mANT 15s","code":"MTAS-5G-15D120","type":"sector","band":"5 
-  { "brand":"Ubiquiti","model":"PowerBeam M5-400","code":"PBE-M5-400","type":"dish CPE","band":"5 
-  { "brand":"Ubiquiti","model":"NanoBeam 5AC Gen2","code":"NBE-5AC-Gen2","type":"dish CPE","band":"5 
-  { "brand":"Ubiquiti","model":"LiteBeam 5AC Gen2","code":"LBE-5AC-Gen2","type":"dish CPE","band":"5 
-  { "brand":"Ubiquiti","model":"RocketDish RD-5G30","code":"RD-5G30","type":"parabolic","band":"5 
+  {
+    "brand": "MikroTik",
+    "model": "mANT30 PA",
+    "code": "MTAD-5G-30D3-PA",
+    "type": "parabolic",
+    "band": "5 GHz",
+    "gain_dBi": 30.0,
+    "beamwidth_deg_az": 5.0,
+    "beamwidth_deg_el": 5.0,
+    "polarization": "dual-linear (H/V)",
+    "connector": "2x RP-SMA female",
+    "source": "https://mikrotik.com/product/MTAD-5G-30D3-PA"
+  },
+  {
+    "brand": "MikroTik",
+    "model": "LHG 5",
+    "code": "RBLHG-5nD",
+    "type": "grid-dish CPE",
+    "band": "5 GHz",
+    "gain_dBi": 24.5,
+    "beamwidth_deg_az": 7.0,
+    "beamwidth_deg_el": 7.0,
+    "polarization": "dual-linear",
+    "connector": "integrated",
+    "source": "https://i.mt.lv/cdn/product_files/LHG_170905.pdf"
+  },
+  {
+    "brand": "MikroTik",
+    "model": "mANT 15s",
+    "code": "MTAS-5G-15D120",
+    "type": "sector",
+    "band": "5 GHz",
+    "gain_dBi": 15.0,
+    "beamwidth_deg_az": 120.0,
+    "beamwidth_deg_el": 10.0,
+    "polarization": "dual-linear",
+    "connector": "2x RP-SMA",
+    "source": "https://mikrotik.com/product/MTAS-5G-15D120"
+  },
+  {
+    "brand": "Ubiquiti",
+    "model": "PowerBeam M5-400",
+    "code": "PBE-M5-400",
+    "type": "dish CPE",
+    "band": "5 GHz",
+    "gain_dBi": 25.0,
+    "beamwidth_deg_az": 7.0,
+    "beamwidth_deg_el": 7.0,
+    "polarization": "dual-linear",
+    "connector": "integrated",
+    "source": "https://dl.ubnt.com/datasheets/powerbeam/PowerBeam_DS.pdf"
+  },
+  {
+    "brand": "Ubiquiti",
+    "model": "NanoBeam 5AC Gen2",
+    "code": "NBE-5AC-Gen2",
+    "type": "dish CPE",
+    "band": "5 GHz",
+    "gain_dBi": 19.0,
+    "beamwidth_deg_az": 30.0,
+    "beamwidth_deg_el": 30.0,
+    "polarization": "dual-linear",
+    "connector": "integrated",
+    "source": "https://dl.ubnt.com/datasheets/NanoBeam_ac/NanoBeam_AC_Gen2_DS.pdf"
+  },
+  {
+    "brand": "Ubiquiti",
+    "model": "LiteBeam 5AC Gen2",
+    "code": "LBE-5AC-Gen2",
+    "type": "dish CPE",
+    "band": "5 GHz",
+    "gain_dBi": 23.0,
+    "beamwidth_deg_az": 10.0,
+    "beamwidth_deg_el": 10.0,
+    "polarization": "dual-linear",
+    "connector": "integrated",
+    "source": "https://dl.ubnt.com/datasheets/LiteBeam/LiteBeam_AC_Gen2_DS.pdf"
+  },
+  {
+    "brand": "Ubiquiti",
+    "model": "RocketDish RD-5G30",
+    "code": "RD-5G30",
+    "type": "parabolic",
+    "band": "5 GHz",
+    "gain_dBi": 30.0,
+    "beamwidth_deg_az": 5.0,
+    "beamwidth_deg_el": 5.0,
+    "polarization": "dual-linear",
+    "connector": "rocket mount",
+    "source": "https://dl.ubnt.com/datasheets/rocketdish/rd_ds_web.pdf"
+  }
 ]

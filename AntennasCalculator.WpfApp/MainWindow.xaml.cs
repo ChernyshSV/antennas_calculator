@@ -15,6 +15,10 @@ using NetTopologySuite.Geometries;
 using Point = NetTopologySuite.Geometries.Point;
 using AntennasCalculator.WpfApp.ViewModels;
 using AntennasCalculator.WpfApp.Controls;
+using System.Linq;
+using System.Windows.Navigation;
+using AntennasCalculator.WpfApp.Models;
+using AntennasCalculator.WpfApp.Services;
 
 namespace AntennasCalculator.WpfApp
 {
@@ -52,6 +56,9 @@ namespace AntennasCalculator.WpfApp
 
 			// Load antenna catalog if available
 			TryLoadAntennaCatalog();
+
+			// Load persisted settings and apply to VM (after catalog is loaded)
+			LoadSettingsIntoVm();
 		}
 
 		private void TryLoadAntennaCatalog()
@@ -79,6 +86,68 @@ namespace AntennasCalculator.WpfApp
 			}
 		}
 
+		private void LoadSettingsIntoVm()
+		{
+			var s = SettingsService.Load();
+			var vm = Vm;
+			vm.FreqGHz = s.FreqGHz;
+			vm.ClearancePct = s.ClearancePct;
+			vm.Band = s.Band;
+			vm.Technology = s.Technology;
+			vm.ChannelWidthMHz = s.ChannelWidthMHz;
+
+			// Resolve antennas by Code first, then Brand+Model
+			if (vm.AntennaCatalog.Count > 0)
+			{
+				if (!string.IsNullOrWhiteSpace(s.ApAntennaCode))
+					vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Code, s.ApAntennaCode, StringComparison.OrdinalIgnoreCase));
+				if (vm.SelectedApAntenna is null && !string.IsNullOrWhiteSpace(s.ApAntennaBrand) && !string.IsNullOrWhiteSpace(s.ApAntennaModel))
+					vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Brand, s.ApAntennaBrand, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Model, s.ApAntennaModel, StringComparison.OrdinalIgnoreCase));
+
+
+				if (!string.IsNullOrWhiteSpace(s.StaAntennaCode))
+					vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Code, s.StaAntennaCode, StringComparison.OrdinalIgnoreCase));
+				if (vm.SelectedStaAntenna is null && !string.IsNullOrWhiteSpace(s.StaAntennaBrand) && !string.IsNullOrWhiteSpace(s.StaAntennaModel))
+					vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Brand, s.StaAntennaBrand, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Model, s.StaAntennaModel, StringComparison.OrdinalIgnoreCase));
+
+			}
+
+			// Save on close
+			this.Closing += (_, __) => SaveSettingsFromVm();
+		}
+
+		private void SaveSettingsFromVm()
+		{
+			var vm = Vm;
+			var s = new AppSettings
+			{
+				FreqGHz = vm.FreqGHz,
+				ClearancePct = vm.ClearancePct,
+				Band = vm.Band,
+				Technology = vm.Technology,
+				ChannelWidthMHz = vm.ChannelWidthMHz,
+				ApAntennaCode = vm.SelectedApAntenna?.Code,
+				ApAntennaBrand = vm.SelectedApAntenna?.Brand,
+				ApAntennaModel = vm.SelectedApAntenna?.Model,
+				StaAntennaCode = vm.SelectedStaAntenna?.Code,
+				StaAntennaBrand = vm.SelectedStaAntenna?.Brand,
+				StaAntennaModel = vm.SelectedStaAntenna?.Model
+			};
+			SettingsService.Save(s);
+		}
+
+		// Handle hyperlink clicks from antenna details
+		private void OnAntennaLinkNavigate(object sender, RequestNavigateEventArgs e)
+		{
+			try
+			{
+				var uri = e.Uri?.ToString();
+				if (!string.IsNullOrWhiteSpace(uri))
+					System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true });
+			}
+			catch { /* ignore */ }
+			e.Handled = true;
+		}
 
 		private void MapCtrl_Info(object? sender, Mapsui.MapInfoEventArgs e)
 		{

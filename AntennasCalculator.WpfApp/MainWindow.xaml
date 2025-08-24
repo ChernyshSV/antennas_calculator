@@ -232,6 +232,51 @@
                                    Margin="12,0,0,0"
                                    VerticalAlignment="Center" />
                     </DockPanel>
+
+                    <!-- Antenna details -->
+                    <GroupBox Header="Selected Antennas"
+                              Margin="0,8,0,0">
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition />
+                                <RowDefinition />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="AP:"
+                                       Grid.Row="0"
+                                       Grid.Column="0"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="1">
+                          <Run Text="{Binding SelectedApAntenna.Brand}" /><Run Text=" " /><Run Text="{Binding SelectedApAntenna.Model}" />
+                          <Run Text=" — " /><Run Text="{Binding SelectedApAntenna.Type}" /><Run Text=", " /><Run Text="{Binding SelectedApAntenna.Polarization}" />
+                          <Run Text=" — " />
+                          <Hyperlink NavigateUri="{Binding SelectedApAntenna.Source}"
+                                     RequestNavigate="OnAntennaLinkNavigate">
+                            <Run Text="{Binding SelectedApAntenna.Source}" />
+                          </Hyperlink>
+                            </TextBlock>
+
+                            <TextBlock Text="STA:"
+                                       Grid.Row="1"
+                                       Grid.Column="0"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="1">
+                          <Run Text="{Binding SelectedStaAntenna.Brand}" /><Run Text=" " /><Run Text="{Binding SelectedStaAntenna.Model}" />
+                          <Run Text=" — " /><Run Text="{Binding SelectedStaAntenna.Type}" /><Run Text=", " /><Run Text="{Binding SelectedStaAntenna.Polarization}" />
+                          <Run Text=" — " />
+                          <Hyperlink NavigateUri="{Binding SelectedStaAntenna.Source}"
+                                     RequestNavigate="OnAntennaLinkNavigate">
+                            <Run Text="{Binding SelectedStaAntenna.Source}" />
+                          </Hyperlink>
+                            </TextBlock>
+                        </Grid>
+                    </GroupBox>
                 </StackPanel>
             </ScrollViewer>
         </Border>
