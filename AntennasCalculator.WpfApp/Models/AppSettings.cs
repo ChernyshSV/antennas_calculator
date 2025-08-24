@@ -8,6 +8,10 @@
 		public string Technology { get; set; } = "AirMax";
 		public int ChannelWidthMHz { get; set; } = 40;
 
+		public double ApHeightM { get; set; } = 10;
+		public double StaHeightM { get; set; } = 10;
+		public string? DemFolder { get; set; }
+
 		// Antenna IDs (prefer strong keys if available; fall back to Brand+Model)
 		public string? ApAntennaCode { get; set; }
 		public string? ApAntennaBrand { get; set; }

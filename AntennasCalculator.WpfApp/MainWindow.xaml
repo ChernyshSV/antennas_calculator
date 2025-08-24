@@ -152,7 +152,38 @@
                                    Margin="8,0,0,0"
                                    VerticalAlignment="Center" />
                     </StackPanel>
-
+                    <!-- Row 4.5: Endpoint heights and DEM folder -->
+                    <UniformGrid Columns="3"
+                                 Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,12,0">
+                            <TextBlock Text="AP Height:"
+                                       Width="90"
+                                       VerticalAlignment="Center" />
+                            <TextBox Width="80"
+                                     Text="{Binding ApHeightM, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text=" m"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,12,0">
+                            <TextBlock Text="STA Height:"
+                                       Width="90"
+                                       VerticalAlignment="Center" />
+                            <TextBox Width="80"
+                                     Text="{Binding StaHeightM, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text=" m"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="DEM Folder:"
+                                       Width="90"
+                                       VerticalAlignment="Center" />
+                            <TextBox Width="250"
+                                     Text="{Binding DemFolder, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Path with SRTM .hgt tiles (e.g., N50E030.hgt)" />
+                        </StackPanel>
+                    </UniformGrid>
                     <!-- Row 5: Antenna gains -->
                     <UniformGrid Columns="2"
                                  Margin="0,0,0,8">
@@ -227,10 +258,17 @@
                                      StrokeThickness="0.5" />
                             <TextBlock x:Name="LosText"
                                        VerticalAlignment="Center" />
+
+                            <TextBlock x:Name="StatusText"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock x:Name="StatusText"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center" />
+                        <TextBlock Margin="12,0,0,0"
+                                   VerticalAlignment="Center">
+                          <Run Text="Min actual clearance: " />
+                          <Run Text="{Binding MinClearancePctActual, StringFormat={}{0:0.#}}" />
+                          <Run Text=" % of R1" />
+                        </TextBlock>
                     </DockPanel>
 
                     <!-- Antenna details -->

@@ -19,6 +19,7 @@ using System.Linq;
 using System.Windows.Navigation;
 using AntennasCalculator.WpfApp.Models;
 using AntennasCalculator.WpfApp.Services;
+using Fresnel.Core.Dem;
 
 namespace AntennasCalculator.WpfApp
 {
@@ -96,6 +97,10 @@ namespace AntennasCalculator.WpfApp
 			vm.Technology = s.Technology;
 			vm.ChannelWidthMHz = s.ChannelWidthMHz;
 
+			vm.ApHeightM = s.ApHeightM;
+			vm.StaHeightM = s.StaHeightM;
+			vm.DemFolder = s.DemFolder ?? string.Empty;
+
 			// Resolve antennas by Code first, then Brand+Model
 			if (vm.AntennaCatalog.Count > 0)
 			{
@@ -126,6 +131,9 @@ namespace AntennasCalculator.WpfApp
 				Band = vm.Band,
 				Technology = vm.Technology,
 				ChannelWidthMHz = vm.ChannelWidthMHz,
+				ApHeightM = vm.ApHeightM,
+				StaHeightM = vm.StaHeightM,
+				DemFolder = string.IsNullOrWhiteSpace(vm.DemFolder) ? null : vm.DemFolder,
 				ApAntennaCode = vm.SelectedApAntenna?.Code,
 				ApAntennaBrand = vm.SelectedApAntenna?.Brand,
 				ApAntennaModel = vm.SelectedApAntenna?.Model,
@@ -230,15 +238,28 @@ namespace AntennasCalculator.WpfApp
 			var profile = new List<(double x, double r)>(samples + 1);
 			double totalMeters = dist;
 
+			var terrain = new List<(double x, double z)>(samples + 1);
+			var vm = Vm;
+			IDemProvider dem = string.IsNullOrWhiteSpace(vm.DemFolder) ? new FlatDemProvider() : new HgtDemProvider(vm.DemFolder);
+
 			for (int i = 0; i <= samples; i++)
 			{
 				var t = i / (double)samples;
 				var g = GeoUtils.Lerp(_p1, _p2, t);
+
 				var d1 = dist * t;
 				var d2 = dist - d1;
 				var r1 = _fresnel.Radius1(freqHz, d1, d2);
 				var radius = r1 * (clearancePct / 100.0);
 				profile.Add((d1, r1));
+
+				// Terrain elevation and straight-line LOS height
+				var ground = dem.GetElevation(g.LatitudeDeg, g.LongitudeDeg);
+				terrain.Add((d1, ground));
+
+				// LOS linear interpolation between endpoint antenna heights above sea level
+				var groundA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg);
+				var groundB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg);
 
 				var world = SphericalMercator.FromLonLat(g.LongitudeDeg, g.LatitudeDeg);
 				var meterScale = Math.Cos(g.LatitudeDeg * Math.PI / 180.0);
@@ -249,6 +270,10 @@ namespace AntennasCalculator.WpfApp
 			{
 				var t = i / (double)samples;
 				var g = GeoUtils.Lerp(_p1, _p2, t);
+
+				var ground = dem.GetElevation(g.LatitudeDeg, g.LongitudeDeg);
+				terrain.Add((dist - dist * t, ground)); // reversed x for closing polygon not needed but collected
+
 				var d1 = dist * t;
 				var d2 = dist - d1;
 				var r1 = _fresnel.Radius1(freqHz, d1, d2);
@@ -279,10 +304,35 @@ namespace AntennasCalculator.WpfApp
 			MapCtrl.RefreshGraphics();
 
 			// Update profile view (if user switches to the tab)
-			Profile?.SetData(profile, clearancePct, totalMeters);
+			Profile?.SetDataWithTerrain(profile, clearancePct, totalMeters, terrain);
 			TopTabs.SelectedIndex = 1; // switch to Profile tab for immediate feedback
 									   // LOS / clearance indicator (stubbed: no terrain => theoretical check only)
 			UpdateLosIndicator(clearancePct);
+
+			// Compute actual min clearance along the path using terrain
+			// Compute LOS height at endpoints:
+			var zA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg) + vm.ApHeightM;
+			var zB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg) + vm.StaHeightM;
+			double minPct = double.PositiveInfinity;
+			for (int i = 0; i <= samples; i++)
+			{
+				var t = i / (double)samples;
+				var d1i = dist * t;
+				var d2i = dist - d1i;
+				var r1i = _fresnel.Radius1(freqHz, d1i, d2i);
+				var ground = dem.GetElevation(
+					_p1.LatitudeDeg + (_p2.LatitudeDeg - _p1.LatitudeDeg) * t,
+					_p1.LongitudeDeg + (_p2.LongitudeDeg - _p1.LongitudeDeg) * t);
+				var losZi = zA + (zB - zA) * t; // straight line between endpoints
+				var clearanceMeters = losZi - ground;
+				var pct = r1i > 0 ? (clearanceMeters / r1i) * 100.0 : 0;
+				if (pct < minPct) minPct = pct;
+			}
+			if (double.IsInfinity(minPct) || double.IsNaN(minPct)) minPct = 0;
+			vm.MinClearancePctActual = minPct;
+
+			// LOS / clearance indicator uses actual min clearance now
+			UpdateLosIndicator(minPct);
 		}
 
 		private void UpdateLosIndicator(double targetClearancePct)

@@ -11,6 +11,7 @@ namespace AntennasCalculator.WpfApp.Controls;
 public partial class ProfileView : UserControl
 {
 	private readonly List<(double x, double r)> _samples = new();
+	private readonly List<(double x, double z)> _terrain = new();
 	private double _clearancePct = 60.0;
 	private double _totalMeters = 0.0;
 
@@ -31,6 +32,14 @@ public partial class ProfileView : UserControl
 		_samples.Sort((a, b) => a.x.CompareTo(b.x));
 		_clearancePct = clearancePct;
 		_totalMeters = Math.Max(1, totalMeters);
+		Redraw();
+	}
+
+	public void SetDataWithTerrain(IEnumerable<(double x, double r)> samples, double clearancePct, double totalMeters, IEnumerable<(double x, double z)> terrain)
+	{
+		SetData(samples, clearancePct, totalMeters);
+		_terrain.Clear();
+		_terrain.AddRange(terrain.OrderBy(t => t.x));
 		Redraw();
 	}
 
@@ -57,6 +66,20 @@ public partial class ProfileView : UserControl
 		// Draw midline (LOS)
 		var los = new Line { X1 = 0, X2 = w, Y1 = yMid, Y2 = yMid, Stroke = Brushes.Gray, StrokeThickness = 1, StrokeDashArray = new DoubleCollection { 2, 2 } };
 		Canvas.Children.Add(los);
+
+		// Draw terrain
+		if (_terrain.Count >= 2)
+		{
+			var terr = new Polyline { Stroke = Brushes.DimGray, StrokeThickness = 1.5 };
+			foreach (var (x, z) in _terrain)
+			{
+				double sx = x / _totalMeters * w;
+				double sy = yMid - (z / (Math.Max(1, _terrain.Max(t => t.z) - _terrain.Min(t => t.z))) * (h * 0.6 - 20)) + 20;
+				terr.Points.Add(new Point(sx, sy));
+			}
+			Canvas.Children.Add(terr);
+		}
+
 
 		// Build top and bottom polylines of Fresnel tube
 		var top = new Polyline { Stroke = Brushes.SteelBlue, StrokeThickness = 1.5 };

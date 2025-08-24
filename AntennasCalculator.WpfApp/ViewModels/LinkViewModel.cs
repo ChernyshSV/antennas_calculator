@@ -15,6 +15,10 @@ public sealed class LinkViewModel : INotifyPropertyChanged
 	private int _channelWidthMHz = 40;
 	private int _apGainDbi = 16;
 	private int _staGainDbi = 16;
+	private double _apHeightM = 10;
+	private double _staHeightM = 10;
+	private string _demFolder = string.Empty;
+	private double _minClearancePctActual = 0;
 	private AntennaSpec? _selectedAp;
 	private AntennaSpec? _selectedSta;
 
@@ -24,6 +28,32 @@ public sealed class LinkViewModel : INotifyPropertyChanged
 		get => _freqGHz;
 		set { if (_freqGHz != value) { _freqGHz = value; OnPropertyChanged(); } }
 	}
+
+	public double ApHeightM
+	{
+		get => _apHeightM;
+		set { if (_apHeightM != value) { _apHeightM = value; OnPropertyChanged(); } }
+	}
+
+	public double StaHeightM
+	{
+		get => _staHeightM;
+		set { if (_staHeightM != value) { _staHeightM = value; OnPropertyChanged(); } }
+	}
+
+	public string DemFolder
+	{
+		get => _demFolder;
+		set { if (_demFolder != value) { _demFolder = value; OnPropertyChanged(); } }
+	}
+
+	/// <summary>Computed min clearance along path (percent of R1). Readonly for UI.</summary>
+	public double MinClearancePctActual
+	{
+		get => _minClearancePctActual;
+		set { if (Math.Abs(_minClearancePctActual - value) > 1e-6) { _minClearancePctActual = value; OnPropertyChanged(); } }
+	}
+
 
 	public AntennaSpec? SelectedApAntenna
 	{
