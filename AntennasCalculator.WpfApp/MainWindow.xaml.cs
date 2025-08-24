@@ -333,6 +333,53 @@ namespace AntennasCalculator.WpfApp
 
 			// LOS / clearance indicator uses actual min clearance now
 			UpdateLosIndicator(minPct);
+
+			HighlightViolationSegments(dem, dist, freqHz, vm, samples);
+		}
+
+		private void HighlightViolationSegments(IDemProvider dem, double dist, double freqHz, LinkViewModel vm, int samples)
+		{
+			if (_p1 is null || _p2 is null) return;
+			var zA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg) + vm.ApHeightM;
+			var zB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg) + vm.StaHeightM;
+			var ranges = new List<(double xs, double xe)>();
+			bool inBad = false;
+			double startBad = 0;
+
+			for (int i = 0; i <= samples; i++)
+			{
+				double t = i / (double)samples;
+				double d1 = dist * t;
+				double d2 = dist - d1;
+				var r1 = _fresnel.Radius1(freqHz, d1, d2);
+
+				var ground = dem.GetElevation(
+					_p1.LatitudeDeg + (_p2.LatitudeDeg - _p1.LatitudeDeg) * t,
+					_p1.LongitudeDeg + (_p2.LongitudeDeg - _p1.LongitudeDeg) * t);
+
+				var losZi = zA + (zB - zA) * t;
+				var clearanceMeters = losZi - ground;
+				double pct = r1 > 0 ? (clearanceMeters / r1) * 100.0 : 0.0;
+				bool bad = pct < vm.ClearancePct; // violation if below target
+
+				if (bad && !inBad)
+				{
+					inBad = true;
+					startBad = d1;
+				}
+				else if (!bad && inBad)
+				{
+					inBad = false;
+					ranges.Add((startBad, d1));
+				}
+			}
+			if (inBad)
+			{
+				ranges.Add((startBad, dist));
+			}
+
+			// Pass to profile for drawing
+			Profile?.SetViolations(ranges);
 		}
 
 		private void UpdateLosIndicator(double targetClearancePct)
@@ -362,5 +409,7 @@ namespace AntennasCalculator.WpfApp
 			LosText.Text = text;
 			LosDot.Fill = brush;
 		}
+
+
 	}
 }

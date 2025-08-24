@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Linq;
+using System.Windows.Documents;
 
 namespace AntennasCalculator.WpfApp.Controls;
 
@@ -12,6 +14,7 @@ public partial class ProfileView : UserControl
 {
 	private readonly List<(double x, double r)> _samples = new();
 	private readonly List<(double x, double z)> _terrain = new();
+	private readonly List<(double xs, double xe)> _violations = new();
 	private double _clearancePct = 60.0;
 	private double _totalMeters = 0.0;
 
@@ -43,6 +46,14 @@ public partial class ProfileView : UserControl
 		Redraw();
 	}
 
+	public void SetViolations(IEnumerable<(double xs, double xe)> segmentsMeters)
+	{
+		_violations.Clear();
+		foreach (var (xs, xe) in segmentsMeters)
+			if (xe > xs) _violations.Add((xs, xe));
+		Redraw();
+	}
+
 	private void Redraw()
 	{
 		if (Canvas is null) return;
@@ -50,6 +61,8 @@ public partial class ProfileView : UserControl
 
 		double w = Math.Max(1, Canvas.ActualWidth);
 		double h = Math.Max(1, Canvas.ActualHeight);
+
+		double yMid = h * 0.5;
 
 		if (_samples.Count < 2)
 		{
@@ -61,7 +74,25 @@ public partial class ProfileView : UserControl
 		var maxR = _samples.Max(s => s.r);
 		if (maxR <= 0) maxR = 1;
 		double yScale = (h * 0.4) / maxR; // 40% of height up and down
-		double yMid = h * 0.5;
+
+		// Draw violation shading first (so lines overlay them)
+		if (_violations.Count > 0)
+		{
+			foreach (var (xs, xe) in _violations)
+			{
+				double sx = xs / _totalMeters * w;
+				double ex = xe / _totalMeters * w;
+				var rect = new Rectangle
+				{
+					Width = Math.Max(1, ex - sx),
+					Height = h,
+					Fill = new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0x00, 0x00))
+				};
+				Canvas.Children.Add(rect);
+				Canvas.SetLeft(rect, sx);
+				Canvas.SetTop(rect, 0);
+			}
+		}
 
 		// Draw midline (LOS)
 		var los = new Line { X1 = 0, X2 = w, Y1 = yMid, Y2 = yMid, Stroke = Brushes.Gray, StrokeThickness = 1, StrokeDashArray = new DoubleCollection { 2, 2 } };
@@ -103,6 +134,19 @@ public partial class ProfileView : UserControl
 		Canvas.Children.Add(bot);
 		Canvas.Children.Add(clrTop);
 		Canvas.Children.Add(clrBot);
+
+		// Red line across violating spans at LOS level for emphasis
+		if (_violations.Count > 0)
+		{
+			foreach (var (xs, xe) in _violations)
+			{
+				double sx = xs / _totalMeters * w;
+				double ex = xe / _totalMeters * w;
+				var vline = new Line { X1 = sx, X2 = ex, Y1 = yMid, Y2 = yMid, Stroke = Brushes.Red, StrokeThickness = 2.0 };
+				Canvas.Children.Add(vline);
+			}
+		}
+
 
 		DrawAxes(w, h);
 
