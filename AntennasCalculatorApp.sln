@@ -5,7 +5,7 @@ VisualStudioVersion = 17.0.31912.275
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fresnel.Core", "Fresnel.Core\Fresnel.Core.csproj", "{11111111-1111-1111-1111-111111111111}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AntennasCalculator.WpfApp", "Fresnel.Demo.Wpf\AntennasCalculator.WpfApp.csproj", "{33333333-3333-3333-3333-333333333333}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AntennasCalculator.WpfApp", "AntennasCalculator.WpfApp\AntennasCalculator.WpfApp.csproj", "{33333333-3333-3333-3333-333333333333}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
