@@ -22,6 +22,7 @@ using AntennasCalculator.WpfApp.Services;
 using Fresnel.Core.Dem;
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace AntennasCalculator.WpfApp
 {
@@ -428,21 +429,72 @@ namespace AntennasCalculator.WpfApp
 			return $"{ns}{alat:00}{ew}{alon:000}";
 		}
 
-		private IEnumerable<string> TilesForSegment((double lat, double lon) a, (double lat, double lon) b, int margin = 0)
+		private static double NormalizeLon(double lon)
 		{
-			// basic bbox-based coverage; not handling dateline wrap (assume short links)
+			// normalize to [-180, 180)
+			while (lon < -180) lon += 360;
+			while (lon >= 180) lon -= 360;
+			return lon;
+		}
+
+		private IEnumerable<string> TilesForSegment((double lat, double lon) a, (double lat, double lon) b, int margin, bool forceDatelineWrap)
+		{
+			//// basic bbox-based coverage; not handling dateline wrap (assume short links)
+			//double minLat = Math.Min(a.lat, b.lat);
+			//double maxLat = Math.Max(a.lat, b.lat);
+			//double minLon = Math.Min(a.lon, b.lon);
+			//double maxLon = Math.Max(a.lon, b.lon);
+			//int latStart = (int)Math.Floor(minLat) - margin;
+			//int latEnd = (int)Math.Floor(maxLat) + margin;
+			//int lonStart = (int)Math.Floor(minLon) - margin;
+			//int lonEnd = (int)Math.Floor(maxLon) + margin;
+
+			// bbox-based coverage with dateline handling
+			double aLon = NormalizeLon(a.lon);
+			double bLon = NormalizeLon(b.lon);
 			double minLat = Math.Min(a.lat, b.lat);
 			double maxLat = Math.Max(a.lat, b.lat);
-			double minLon = Math.Min(a.lon, b.lon);
-			double maxLon = Math.Max(a.lon, b.lon);
+
+			// Choose whether bbox crosses dateline
+			bool wrap = forceDatelineWrap;
+			if (!wrap)
+			{
+				double span = Math.Abs(aLon - bLon);
+				wrap = span > 180; // auto-detect crossing
+			}
+			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			//for (int lat = latStart; lat <= latEnd; lat++)
+			//	for (int lon = lonStart; lon <= lonEnd; lon++)
+			//		set.Add(TileName(lat, lon));
 			int latStart = (int)Math.Floor(minLat) - margin;
 			int latEnd = (int)Math.Floor(maxLat) + margin;
-			int lonStart = (int)Math.Floor(minLon) - margin;
-			int lonEnd = (int)Math.Floor(maxLon) + margin;
-			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			for (int lat = latStart; lat <= latEnd; lat++)
-				for (int lon = lonStart; lon <= lonEnd; lon++)
-					set.Add(TileName(lat, lon));
+			if (!wrap)
+			{
+				double minLon = Math.Min(aLon, bLon);
+				double maxLon = Math.Max(aLon, bLon);
+				int lonStart = (int)Math.Floor(minLon) - margin;
+				int lonEnd = (int)Math.Floor(maxLon) + margin;
+				for (int lat = latStart; lat <= latEnd; lat++)
+					for (int lon = lonStart; lon <= lonEnd; lon++)
+						set.Add(TileName(lat, lon));
+			}
+			else
+			{
+				// Two intervals: [-180..min] and [max..180)
+				double minLon = Math.Min(aLon, bLon);
+				double maxLon = Math.Max(aLon, bLon);
+				int lonStart1 = -180 - margin;
+				int lonEnd1 = (int)Math.Floor(minLon) + margin;
+				int lonStart2 = (int)Math.Floor(maxLon) - margin;
+				int lonEnd2 = 179 + margin;
+				for (int lat = latStart; lat <= latEnd; lat++)
+				{
+					for (int lon = lonStart1; lon <= lonEnd1; lon++)
+						set.Add(TileName(lat, lon));
+					for (int lon = lonStart2; lon <= lonEnd2; lon++)
+						set.Add(TileName(lat, lon));
+				}
+			}
 			return set.OrderBy(s => s);
 		}
 
@@ -450,7 +502,7 @@ namespace AntennasCalculator.WpfApp
 		{
 			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			int lat0 = (int)Math.Floor(c.lat);
-			int lon0 = (int)Math.Floor(c.lon);
+			int lon0 = (int)Math.Floor(NormalizeLon(c.lon));
 			for (int dy = -radius; dy <= radius; dy++)
 				for (int dx = -radius; dx <= radius; dx++)
 					set.Add(TileName(lat0 + dy, lon0 + dx));
@@ -471,7 +523,7 @@ namespace AntennasCalculator.WpfApp
 			{
 				required = TilesForSegment((_p1.LatitudeDeg, _p1.LongitudeDeg),
 										   (_p2.LatitudeDeg, _p2.LongitudeDeg),
-										   margin: 0);
+										   margin: 0, true);
 			}
 			else
 			{
@@ -485,13 +537,15 @@ namespace AntennasCalculator.WpfApp
 			vm.DemScan.Clear();
 			foreach (var name in required)
 			{
+				//var files = Directory.GetFiles(vm.DemFolder, "")
+
 				string path = Path.Combine(vm.DemFolder, name + ".hgt");
 				bool exists = File.Exists(path);
 				if (!exists)
 				{
 					// Try lowercase/uppercase variants (Windows ignores, but just in case cross-platform)
-					var alt = Directory.GetFiles(vm.DemFolder, name + ".hgt", SearchOption.TopDirectoryOnly)
-						.Concat(Directory.GetFiles(vm.DemFolder, name + ".HGT", SearchOption.TopDirectoryOnly))
+					var alt = Directory.GetFiles(vm.DemFolder, name + ".hgt", SearchOption.AllDirectories)
+						.Concat(Directory.GetFiles(vm.DemFolder, name + ".HGT", SearchOption.AllDirectories))
 						.FirstOrDefault();
 					if (!string.IsNullOrEmpty(alt)) { path = alt; exists = true; }
 				}
@@ -508,6 +562,94 @@ namespace AntennasCalculator.WpfApp
 			else
 			{
 				StatusText.Text = "All required DEM tiles are present.";
+			}
+		}
+
+		private void OpenDemFolder_Click(object sender, RoutedEventArgs e)
+		{
+			var vm = Vm;
+			if (string.IsNullOrWhiteSpace(vm.DemFolder) || !Directory.Exists(vm.DemFolder))
+			{
+				MessageBox.Show("Тека DEM Folder не задана або не існує.");
+				return;
+			}
+			try
+			{
+				Process.Start(new ProcessStartInfo(vm.DemFolder) { UseShellExecute = true });
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show("Не вдалося відкрити теку: " + ex.Message);
+			}
+		}
+
+		private void CopyMissingTiles_Click(object sender, RoutedEventArgs e)
+		{
+			var vm = Vm;
+			var missing = vm.DemScan.Where(t => !t.Exists).Select(t => t.Name + ".hgt").ToList();
+			if (missing.Count == 0)
+			{
+				MessageBox.Show("Всі необхідні тайли присутні.");
+				return;
+			}
+			try
+			{
+				System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, missing));
+				MessageBox.Show("Перелік відсутніх тайлів скопійовано в буфер обміну.");
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show("Не вдалося скопіювати до буфера: " + ex.Message);
+			}
+		}
+
+		private void ShowDownloadHelp_Click(object sender, RoutedEventArgs e)
+		{
+			// Ми не завантажуємо автоматично, але даємо інструкції.
+			var msg =
+				"Джерела DEM (.hgt) для SRTM:\n\n" +
+				"• USGS EarthExplorer (SRTM1/SRTM3).\n" +
+				"• NASA/LP DAAC (NASA Earthdata).\n" +
+				"• Viewfinder Panoramas (для важкодоступних регіонів).\n\n" +
+				"Поради:\n" +
+				"1) Скачайте файли з іменами на кшталт N50E030.hgt, S10W123.hgt.\n" +
+				"2) Покладіть їх у теку DEM Folder, натисніть ‘Scan required tiles’.";
+			MessageBox.Show(msg, "Where to get .hgt", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		private async void DownloadMissingHgt_Click(object sender, RoutedEventArgs e)
+		{
+			var vm = Vm;
+			if (string.IsNullOrWhiteSpace(vm.DemFolder) || !Directory.Exists(vm.DemFolder))
+			{
+				MessageBox.Show("Спочатку вкажіть коректний DEM Folder.");
+				return;
+			}
+			var missing = vm.DemScan.Where(t => !t.Exists).Select(t => t.Name).ToList();
+			if (missing.Count == 0)
+			{
+				MessageBox.Show("Всі необхідні тайли вже присутні.\\nНатисніть 'Scan required tiles' щоб оновити список.");
+				return;
+			}
+			try
+			{
+				var btn = sender as System.Windows.Controls.Button;
+				if (btn is not null) btn.IsEnabled = false;
+				StatusText.Text = "Починаю завантаження відсутніх .hgt...";
+				var progress = new Progress<string>(s => StatusText.Text = s);
+				var ok = await HgtDownloadService.DownloadMissingAsync(missing, vm.DemFolder, progress);
+				// Re-scan the folder to refresh statuses
+				ScanDemTiles_Click(sender, e);
+				MessageBox.Show($"Завантажено: {ok.Count} з {missing.Count} тайлів.");
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show("Помилка під час завантаження: " + ex.Message);
+			}
+			finally
+			{
+				var btn = sender as System.Windows.Controls.Button;
+				if (btn is not null) btn.IsEnabled = true;
 			}
 		}
 	}

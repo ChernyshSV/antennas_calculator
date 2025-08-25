@@ -339,16 +339,36 @@
                     <GroupBox Header="DEM tiles"
                               Margin="0,8,0,0">
                         <DockPanel>
-                            <StackPanel Orientation="Horizontal"
-                                        DockPanel.Dock="Top"
-                                        Margin="8">
+                            <Grid DockPanel.Dock="Top"
+                                  Margin="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
                                 <Button Content="Scan required tiles"
-                                        Click="ScanDemTiles_Click" />
-                                <TextBlock Text=" "
-                                           Width="12" />
+                                        Click="ScanDemTiles_Click"
+                                        Grid.Column="0" />
+                                <StackPanel Orientation="Horizontal"
+                                            Grid.Column="1"
+                                            Margin="12,0,0,0"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="margin:"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="30"
+                                             Margin="6,0,0,0"
+                                             Text="{Binding DemScanMargin, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Margin="12,0,0,0"
+                                              Content="Force dateline wrap"
+                                              IsChecked="{Binding ForceDatelineWrap}" />
+                                </StackPanel>
                                 <TextBlock Text="{Binding DemScanSummary}"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
+                                           VerticalAlignment="Center"
+                                           Grid.Column="3"
+                                           HorizontalAlignment="Right" />
+                            </Grid>
                             <ListView ItemsSource="{Binding DemScan}"
                                       Margin="8"
                                       Height="140">
@@ -380,6 +400,21 @@
                                     </GridView>
                                 </ListView.View>
                             </ListView>
+                            <StackPanel Orientation="Horizontal"
+                                        Margin="8,0,8,8"
+                                        DockPanel.Dock="Bottom">
+                                <Button Content="Open folder"
+                                        Click="OpenDemFolder_Click" />
+                                <Button Content="Copy missing"
+                                        Margin="8,0,0,0"
+                                        Click="CopyMissingTiles_Click" />
+                                <Button Content="Download help"
+                                        Margin="8,0,0,0"
+                                        Click="ShowDownloadHelp_Click" />
+                                <Button Content="Download missing (.hgt)"
+                                        Margin="8,0,0,0"
+                                        Click="DownloadMissingHgt_Click" />
+                            </StackPanel>
                         </DockPanel>
                     </GroupBox>
 

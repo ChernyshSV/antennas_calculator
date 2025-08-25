@@ -25,12 +25,31 @@ public sealed class LinkViewModel : INotifyPropertyChanged
 	private AntennaSpec? _selectedSta;
 	public ObservableCollection<DemTileStatus> DemScan { get; } = new();
 	private string _demScanSummary = string.Empty;
+	private int _demScanMargin = 0; // tiles padding around bbox
+	private bool _forceDatelineWrap = false;
 
 	public double FreqGHz
 	{
 		get => _freqGHz;
 		set { if (_freqGHz != value) { _freqGHz = value; OnPropertyChanged(); } }
 	}
+
+	public int DemScanMargin
+	{
+		get => _demScanMargin;
+		set { if (_demScanMargin != value) { _demScanMargin = Math.Max(0, Math.Min(3, value)); OnPropertyChanged(); } }
+	}
+
+	/// <summary>
+	/// When true, treat longitudes as wrapping across ±180 explicitly (useful near the dateline).
+	/// When false, we auto-detect wrap if bbox width > 180°.
+	/// </summary>
+	public bool ForceDatelineWrap
+	{
+		get => _forceDatelineWrap;
+		set { if (_forceDatelineWrap != value) { _forceDatelineWrap = value; OnPropertyChanged(); } }
+	}
+
 	public string DemScanSummary
 	{
 		get => _demScanSummary;
