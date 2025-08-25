@@ -1,8 +1,9 @@
-using System.Windows;
-using System.IO;
-using Fresnel.Core.Antennas;
-using System.Linq;
+using AntennasCalculator.WpfApp.Models;
+using AntennasCalculator.WpfApp.Services;
+using AntennasCalculator.WpfApp.ViewModels;
 using Fresnel.Core;
+using Fresnel.Core.Antennas;
+using Fresnel.Core.Dem;
 using Mapsui;
 using Mapsui.Extensions;
 using Mapsui.Layers;
@@ -12,31 +13,38 @@ using Mapsui.Tiling;
 using Mapsui.UI.Wpf;
 using Mapsui.Widgets.ScaleBar;
 using NetTopologySuite.Geometries;
-using Point = NetTopologySuite.Geometries.Point;
-using AntennasCalculator.WpfApp.ViewModels;
-using AntennasCalculator.WpfApp.Controls;
-using System.Linq;
-using System.Windows.Navigation;
-using AntennasCalculator.WpfApp.Models;
-using AntennasCalculator.WpfApp.Services;
-using Fresnel.Core.Dem;
-using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
 using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Navigation;
+using Point = NetTopologySuite.Geometries.Point;
 
 namespace AntennasCalculator.WpfApp
 {
 	public partial class MainWindow : Window
 	{
-		private readonly MemoryLayer _pointsLayer = new() { Name = "Points" };
-		private readonly MemoryLayer _lineLayer = new() { Name = "Link" };
-		private readonly MemoryLayer _fresnelLayer = new() { Name = "Fresnel" };
 		private readonly IFresnelCalculator _fresnel = new FresnelCalculator();
+
+		private readonly MemoryLayer _fresnelLayer = new()
+		{
+			Name = "Fresnel"
+		};
+
+		private readonly MemoryLayer _lineLayer = new()
+		{
+			Name = "Link"
+		};
+
+		private readonly MemoryLayer _pointsLayer = new()
+		{
+			Name = "Points"
+		};
 
 		private GeoPoint? _p1;
 		private GeoPoint? _p2;
 
-		private LinkViewModel Vm => (LinkViewModel)DataContext;
 		public MainWindow()
 		{
 			InitializeComponent();
@@ -65,24 +73,38 @@ namespace AntennasCalculator.WpfApp
 			LoadSettingsIntoVm();
 		}
 
+		private LinkViewModel Vm
+		{
+			get => (LinkViewModel)DataContext;
+		}
+
 		private void TryLoadAntennaCatalog()
 		{
 			var vm = Vm;
-			string[] candidates = new[] {
-					  System.IO.Path.Combine(AppContext.BaseDirectory, "Antennas", "antenna_catalog.json"),
-					  System.IO.Path.Combine(AppContext.BaseDirectory, "..","..","..","Fresnel.Core","Antennas","antenna_catalog.json"),
-					  System.IO.Path.Combine(AppContext.BaseDirectory, "..","..","..","..","Fresnel.Core","Antennas","antenna_catalog.json")
-				  };
-			string? path = candidates.FirstOrDefault(File.Exists);
+			var candidates = new[]
+			{
+				Path.Combine(AppContext.BaseDirectory, "Antennas", "antenna_catalog.json"),
+				Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Fresnel.Core", "Antennas", "antenna_catalog.json"),
+				Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Fresnel.Core", "Antennas", "antenna_catalog.json")
+			};
+			var path = candidates.FirstOrDefault(File.Exists);
 			if (path is null) return;
 			try
 			{
 				var list = AntennaCatalog.LoadFromJson(path);
 				vm.AntennaCatalog.Clear();
-				foreach (var it in list) vm.AntennaCatalog.Add(it);
+				foreach (var it in list)
+				{
+					vm.AntennaCatalog.Add(it);
+				}
+
 				// Preselect two commonly used ones if found
-				vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a => a.Brand.Contains("MikroTik", System.StringComparison.OrdinalIgnoreCase)) ?? vm.AntennaCatalog.FirstOrDefault();
-				vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a => a.Brand.Contains("Ubiquiti", System.StringComparison.OrdinalIgnoreCase)) ?? vm.AntennaCatalog.FirstOrDefault();
+				vm.SelectedApAntenna =
+					vm.AntennaCatalog.FirstOrDefault(a => a.Brand.Contains("MikroTik", StringComparison.OrdinalIgnoreCase)) ??
+					vm.AntennaCatalog.FirstOrDefault();
+				vm.SelectedStaAntenna =
+					vm.AntennaCatalog.FirstOrDefault(a => a.Brand.Contains("Ubiquiti", StringComparison.OrdinalIgnoreCase)) ??
+					vm.AntennaCatalog.FirstOrDefault();
 			}
 			catch
 			{
@@ -108,20 +130,27 @@ namespace AntennasCalculator.WpfApp
 			if (vm.AntennaCatalog.Count > 0)
 			{
 				if (!string.IsNullOrWhiteSpace(s.ApAntennaCode))
-					vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Code, s.ApAntennaCode, StringComparison.OrdinalIgnoreCase));
-				if (vm.SelectedApAntenna is null && !string.IsNullOrWhiteSpace(s.ApAntennaBrand) && !string.IsNullOrWhiteSpace(s.ApAntennaModel))
-					vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Brand, s.ApAntennaBrand, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Model, s.ApAntennaModel, StringComparison.OrdinalIgnoreCase));
+					vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a =>
+						string.Equals(a.Code, s.ApAntennaCode, StringComparison.OrdinalIgnoreCase));
+				if (vm.SelectedApAntenna is null && !string.IsNullOrWhiteSpace(s.ApAntennaBrand) &&
+					!string.IsNullOrWhiteSpace(s.ApAntennaModel))
+					vm.SelectedApAntenna = vm.AntennaCatalog.FirstOrDefault(a =>
+						string.Equals(a.Brand, s.ApAntennaBrand, StringComparison.OrdinalIgnoreCase) &&
+						string.Equals(a.Model, s.ApAntennaModel, StringComparison.OrdinalIgnoreCase));
 
 
 				if (!string.IsNullOrWhiteSpace(s.StaAntennaCode))
-					vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Code, s.StaAntennaCode, StringComparison.OrdinalIgnoreCase));
-				if (vm.SelectedStaAntenna is null && !string.IsNullOrWhiteSpace(s.StaAntennaBrand) && !string.IsNullOrWhiteSpace(s.StaAntennaModel))
-					vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a => string.Equals(a.Brand, s.StaAntennaBrand, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Model, s.StaAntennaModel, StringComparison.OrdinalIgnoreCase));
-
+					vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a =>
+						string.Equals(a.Code, s.StaAntennaCode, StringComparison.OrdinalIgnoreCase));
+				if (vm.SelectedStaAntenna is null && !string.IsNullOrWhiteSpace(s.StaAntennaBrand) &&
+					!string.IsNullOrWhiteSpace(s.StaAntennaModel))
+					vm.SelectedStaAntenna = vm.AntennaCatalog.FirstOrDefault(a =>
+						string.Equals(a.Brand, s.StaAntennaBrand, StringComparison.OrdinalIgnoreCase) &&
+						string.Equals(a.Model, s.StaAntennaModel, StringComparison.OrdinalIgnoreCase));
 			}
 
 			// Save on close
-			this.Closing += (_, __) => SaveSettingsFromVm();
+			Closing += (_, __) => SaveSettingsFromVm();
 		}
 
 		private void SaveSettingsFromVm()
@@ -154,13 +183,20 @@ namespace AntennasCalculator.WpfApp
 			{
 				var uri = e.Uri?.ToString();
 				if (!string.IsNullOrWhiteSpace(uri))
-					System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true });
+					Process.Start(new ProcessStartInfo(uri)
+					{
+						UseShellExecute = true
+					});
 			}
-			catch { /* ignore */ }
+			catch
+			{
+				/* ignore */
+			}
+
 			e.Handled = true;
 		}
 
-		private void MapCtrl_Info(object? sender, Mapsui.MapInfoEventArgs e)
+		private void MapCtrl_Info(object? sender, MapInfoEventArgs e)
 		{
 			var mapView = sender as MapControl;
 			var mapInfo = e.GetMapInfo(mapView.Map.Layers);
@@ -171,9 +207,19 @@ namespace AntennasCalculator.WpfApp
 			var lonlat = SphericalMercator.ToLonLat(world.X, world.Y);
 			var gp = new GeoPoint(lonlat.lat, lonlat.lon);
 
-			if (_p1 is null) _p1 = gp;
-			else if (_p2 is null) _p2 = gp;
-			else { _p1 = gp; _p2 = null; }
+			if (_p1 is null)
+			{
+				_p1 = gp;
+			}
+			else if (_p2 is null)
+			{
+				_p2 = gp;
+			}
+			else
+			{
+				_p1 = gp;
+				_p2 = null;
+			}
 
 			RedrawPointsAndLine();
 		}
@@ -187,11 +233,13 @@ namespace AntennasCalculator.WpfApp
 				var w = SphericalMercator.FromLonLat(_p1.LongitudeDeg, _p1.LatitudeDeg);
 				features.Add(new GeometryFeature(new Point(w.x, w.y)));
 			}
+
 			if (_p2 is not null)
 			{
 				var w = SphericalMercator.FromLonLat(_p2.LongitudeDeg, _p2.LatitudeDeg);
 				features.Add(new GeometryFeature(new Point(w.x, w.y)));
 			}
+
 			_pointsLayer.Features = features;
 			_pointsLayer.DataHasChanged();
 
@@ -201,8 +249,12 @@ namespace AntennasCalculator.WpfApp
 			{
 				var w1 = SphericalMercator.FromLonLat(_p1.LongitudeDeg, _p1.LatitudeDeg);
 				var w2 = SphericalMercator.FromLonLat(_p2.LongitudeDeg, _p2.LatitudeDeg);
-				lineFeats.Add(new GeometryFeature(new LineString(new[] { new Coordinate(w1.x, w1.y), new Coordinate(w2.x, w2.y) })));
+				lineFeats.Add(new GeometryFeature(new LineString(new[]
+				{
+					new Coordinate(w1.x, w1.y), new Coordinate(w2.x, w2.y)
+				})));
 			}
+
 			_lineLayer.Features = lineFeats;
 			_lineLayer.DataHasChanged();
 
@@ -211,7 +263,8 @@ namespace AntennasCalculator.WpfApp
 
 		private void ClearBtn_Click(object sender, RoutedEventArgs e)
 		{
-			_p1 = null; _p2 = null;
+			_p1 = null;
+			_p2 = null;
 			_pointsLayer.Features = Array.Empty<IFeature>();
 			_lineLayer.Features = Array.Empty<IFeature>();
 			_fresnelLayer.Features = Array.Empty<IFeature>();
@@ -234,12 +287,12 @@ namespace AntennasCalculator.WpfApp
 			var freqHz = fGHz * 1e9;
 			var clearancePct = Vm.ClearancePct > 0 ? Vm.ClearancePct : 60.0;
 			var dist = GeoUtils.HaversineMeters(_p1, _p2);
-			int samples = 64;
+			var samples = 64;
 
 			var coords = new List<Coordinate>(samples * 2 + 2);
 
 			var profile = new List<(double x, double r)>(samples + 1);
-			double totalMeters = dist;
+			var totalMeters = dist;
 
 			var terrain = new List<(double x, double z)>(samples + 1); // aligned with profile
 			var vm = Vm;
@@ -249,7 +302,7 @@ namespace AntennasCalculator.WpfApp
 			var groundA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg);
 			var groundB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg);
 
-			for (int i = 0; i <= samples; i++)
+			for (var i = 0; i <= samples; i++)
 			{
 				var t = i / (double)samples;
 				var g = GeoUtils.Lerp(_p1, _p2, t);
@@ -262,7 +315,7 @@ namespace AntennasCalculator.WpfApp
 
 				// Terrain elevation and straight-line LOS height
 				var ground = dem.GetElevation(g.LatitudeDeg, g.LongitudeDeg);
-				terrain.Add((d1, ground));// aligned index == i
+				terrain.Add((d1, ground)); // aligned index == i
 
 				// LOS linear interpolation between endpoint antenna heights above sea level
 				//var groundA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg);
@@ -273,7 +326,8 @@ namespace AntennasCalculator.WpfApp
 				var rMap = radius / Math.Max(1e-6, meterScale);
 				coords.Add(new Coordinate(world.x, world.y + rMap));
 			}
-			for (int i = samples; i >= 0; i--)
+
+			for (var i = samples; i >= 0; i--)
 			{
 				var t = i / (double)samples;
 				var g = GeoUtils.Lerp(_p1, _p2, t);
@@ -291,11 +345,13 @@ namespace AntennasCalculator.WpfApp
 				var rMap = radius / Math.Max(1e-6, meterScale);
 				coords.Add(new Coordinate(world.x, world.y - rMap));
 			}
+
 			if (coords.Count < 4)
 			{
 				MessageBox.Show("Надто коротка лінія для побудови полігона.");
 				return;
 			}
+
 			// Close the ring
 			var first = coords[0];
 			var last = coords[coords.Count - 1];
@@ -304,7 +360,10 @@ namespace AntennasCalculator.WpfApp
 
 			var ring = new LinearRing(coords.ToArray());
 			var poly = new Polygon(ring);
-			_fresnelLayer.Features = new List<IFeature> { new GeometryFeature(poly) };
+			_fresnelLayer.Features = new List<IFeature>
+			{
+				new GeometryFeature(poly)
+			};
 			_fresnelLayer.DataHasChanged();
 
 			StatusText.Text = $"D≈{dist / 1000:0.###} km, f={fGHz:0.###} GHz, clearance={clearancePct:0.#}%";
@@ -323,8 +382,8 @@ namespace AntennasCalculator.WpfApp
 			//var zA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg) + vm.ApHeightM;
 			//var zB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg) + vm.StaHeightM;
 			// (reuse zA, zB)
-			double minPct = double.PositiveInfinity;
-			for (int i = 0; i <= samples; i++)
+			var minPct = double.PositiveInfinity;
+			for (var i = 0; i <= samples; i++)
 			{
 				var t = i / (double)samples;
 				var d1i = dist * t;
@@ -335,9 +394,10 @@ namespace AntennasCalculator.WpfApp
 					_p1.LongitudeDeg + (_p2.LongitudeDeg - _p1.LongitudeDeg) * t);
 				var losZi = zA + (zB - zA) * t; // straight line between endpoints
 				var clearanceMeters = losZi - ground;
-				var pct = r1i > 0 ? (clearanceMeters / r1i) * 100.0 : 0;
+				var pct = r1i > 0 ? clearanceMeters / r1i * 100.0 : 0;
 				if (pct < minPct) minPct = pct;
 			}
+
 			if (double.IsInfinity(minPct) || double.IsNaN(minPct)) minPct = 0;
 			vm.MinClearancePctActual = minPct;
 
@@ -353,14 +413,14 @@ namespace AntennasCalculator.WpfApp
 			var zA = dem.GetElevation(_p1.LatitudeDeg, _p1.LongitudeDeg) + vm.ApHeightM;
 			var zB = dem.GetElevation(_p2.LatitudeDeg, _p2.LongitudeDeg) + vm.StaHeightM;
 			var ranges = new List<(double xs, double xe)>();
-			bool inBad = false;
+			var inBad = false;
 			double startBad = 0;
 
-			for (int i = 0; i <= samples; i++)
+			for (var i = 0; i <= samples; i++)
 			{
-				double t = i / (double)samples;
-				double d1 = dist * t;
-				double d2 = dist - d1;
+				var t = i / (double)samples;
+				var d1 = dist * t;
+				var d2 = dist - d1;
 				var r1 = _fresnel.Radius1(freqHz, d1, d2);
 
 				var ground = dem.GetElevation(
@@ -369,8 +429,8 @@ namespace AntennasCalculator.WpfApp
 
 				var losZi = zA + (zB - zA) * t;
 				var clearanceMeters = losZi - ground;
-				double pct = r1 > 0 ? (clearanceMeters / r1) * 100.0 : 0.0;
-				bool bad = pct < vm.ClearancePct; // violation if below target
+				var pct = r1 > 0 ? clearanceMeters / r1 * 100.0 : 0.0;
+				var bad = pct < vm.ClearancePct; // violation if below target
 
 				if (bad && !inBad)
 				{
@@ -383,10 +443,9 @@ namespace AntennasCalculator.WpfApp
 					ranges.Add((startBad, d1));
 				}
 			}
+
 			if (inBad)
-			{
 				ranges.Add((startBad, dist));
-			}
 
 			// Pass to profile for drawing
 			Profile?.SetViolations(ranges);
@@ -400,32 +459,33 @@ namespace AntennasCalculator.WpfApp
 			//  - Warn:  40%..60%
 			//  - Bad:   < 40%
 			string text;
-			System.Windows.Media.Brush brush;
+			Brush brush;
 			if (targetClearancePct >= 60)
 			{
-				text = $"LOS OK (target ≥60%)";
-				brush = System.Windows.Media.Brushes.LimeGreen;
+				text = "LOS OK (target ≥60%)";
+				brush = Brushes.LimeGreen;
 			}
 			else if (targetClearancePct >= 40)
 			{
 				text = "Marginal clearance (target <60%)";
-				brush = System.Windows.Media.Brushes.Orange;
+				brush = Brushes.Orange;
 			}
 			else
 			{
 				text = "Insufficient clearance (target <40%)";
-				brush = System.Windows.Media.Brushes.IndianRed;
+				brush = Brushes.IndianRed;
 			}
+
 			LosText.Text = text;
 			LosDot.Fill = brush;
 		}
 
 		private static string TileName(int latFloor, int lonFloor)
 		{
-			char ns = latFloor >= 0 ? 'N' : 'S';
-			char ew = lonFloor >= 0 ? 'E' : 'W';
-			int alat = Math.Abs(latFloor);
-			int alon = Math.Abs(lonFloor);
+			var ns = latFloor >= 0 ? 'N' : 'S';
+			var ew = lonFloor >= 0 ? 'E' : 'W';
+			var alat = Math.Abs(latFloor);
+			var alon = Math.Abs(lonFloor);
 			return $"{ns}{alat:00}{ew}{alon:000}";
 		}
 
@@ -438,58 +498,58 @@ namespace AntennasCalculator.WpfApp
 		}
 
 		private IEnumerable<string> TilesForSegment(
-	(double lat, double lon) a,
-	(double lat, double lon) b,
-	int margin,
-	bool forceDatelineWrap)
+			(double lat, double lon) a,
+			(double lat, double lon) b,
+			int margin,
+			bool forceDatelineWrap)
 		{
 			// bbox-based coverage with dateline handling
-			double aLon = NormalizeLon(a.lon);
-			double bLon = NormalizeLon(b.lon);
-			double minLat = Math.Min(a.lat, b.lat);
-			double maxLat = Math.Max(a.lat, b.lat);
+			var aLon = NormalizeLon(a.lon);
+			var bLon = NormalizeLon(b.lon);
+			var minLat = Math.Min(a.lat, b.lat);
+			var maxLat = Math.Max(a.lat, b.lat);
 
 			// Decide if bbox crosses the dateline
-			bool wrap = forceDatelineWrap;
+			var wrap = forceDatelineWrap;
 			if (!wrap)
 			{
-				double span = Math.Abs(aLon - bLon);
+				var span = Math.Abs(aLon - bLon);
 				wrap = span > 180; // auto-detect crossing
 			}
 
 			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-			int latStart = (int)Math.Floor(minLat) - margin;
-			int latEnd = (int)Math.Floor(maxLat) + margin;
+			var latStart = (int)Math.Floor(minLat) - margin;
+			var latEnd = (int)Math.Floor(maxLat) + margin;
 
 			if (!wrap)
 			{
-				double minLon = Math.Min(aLon, bLon);
-				double maxLon = Math.Max(aLon, bLon);
-				int lonStart = (int)Math.Floor(minLon) - margin;
-				int lonEnd = (int)Math.Floor(maxLon) + margin;
+				var minLon = Math.Min(aLon, bLon);
+				var maxLon = Math.Max(aLon, bLon);
+				var lonStart = (int)Math.Floor(minLon) - margin;
+				var lonEnd = (int)Math.Floor(maxLon) + margin;
 
-				for (int lat = latStart; lat <= latEnd; lat++)
-					for (int lon = lonStart; lon <= lonEnd; lon++)
+				for (var lat = latStart; lat <= latEnd; lat++)
+					for (var lon = lonStart; lon <= lonEnd; lon++)
 						set.Add(TileName(lat, lon));
 			}
 			else
 			{
 				// Split into two longitude ranges across the dateline
-				double minLon = Math.Min(aLon, bLon);
-				double maxLon = Math.Max(aLon, bLon);
+				var minLon = Math.Min(aLon, bLon);
+				var maxLon = Math.Max(aLon, bLon);
 
-				int lonStart1 = -180 - margin;
-				int lonEnd1 = (int)Math.Floor(minLon) + margin;
+				var lonStart1 = -180 - margin;
+				var lonEnd1 = (int)Math.Floor(minLon) + margin;
 
-				int lonStart2 = (int)Math.Floor(maxLon) - margin;
-				int lonEnd2 = 179 + margin;
+				var lonStart2 = (int)Math.Floor(maxLon) - margin;
+				var lonEnd2 = 179 + margin;
 
-				for (int lat = latStart; lat <= latEnd; lat++)
+				for (var lat = latStart; lat <= latEnd; lat++)
 				{
-					for (int lon = lonStart1; lon <= lonEnd1; lon++)
+					for (var lon = lonStart1; lon <= lonEnd1; lon++)
 						set.Add(TileName(lat, lon));
-					for (int lon = lonStart2; lon <= lonEnd2; lon++)
+					for (var lon = lonStart2; lon <= lonEnd2; lon++)
 						set.Add(TileName(lat, lon));
 				}
 			}
@@ -501,10 +561,10 @@ namespace AntennasCalculator.WpfApp
 		private IEnumerable<string> TilesAround((double lat, double lon) c, int radius = 1)
 		{
 			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			int lat0 = (int)Math.Floor(c.lat);
-			int lon0 = (int)Math.Floor(NormalizeLon(c.lon));
-			for (int dy = -radius; dy <= radius; dy++)
-				for (int dx = -radius; dx <= radius; dx++)
+			var lat0 = (int)Math.Floor(c.lat);
+			var lon0 = (int)Math.Floor(NormalizeLon(c.lon));
+			for (var dy = -radius; dy <= radius; dy++)
+				for (var dx = -radius; dx <= radius; dx++)
 					set.Add(TileName(lat0 + dy, lon0 + dx));
 			return set.OrderBy(s => s);
 		}
@@ -538,17 +598,19 @@ namespace AntennasCalculator.WpfApp
 				if (viewport is not null)
 				{
 					// Координати в SphericalMercator (метри)
-					double left = viewport.Value.CenterX - viewport.Value.Width / 2;
-					double right = viewport.Value.CenterX + viewport.Value.Width / 2;
-					double bottom = viewport.Value.CenterY - viewport.Value.Height / 2;
-					double top = viewport.Value.CenterY + viewport.Value.Height / 2;
+					var left = viewport.Value.CenterX - viewport.Value.Width / 2;
+					var right = viewport.Value.CenterX + viewport.Value.Width / 2;
+					var bottom = viewport.Value.CenterY - viewport.Value.Height / 2;
+					var top = viewport.Value.CenterY + viewport.Value.Height / 2;
 
 					// Конвертація в географічні координати
 					var sw = SphericalMercator.ToLonLat(left, bottom); // південно-західний кут
-					var ne = SphericalMercator.ToLonLat(right, top);    // північно-східний кут
+					var ne = SphericalMercator.ToLonLat(right, top); // північно-східний кут
 
-					lonMin = sw.lon; latMin = sw.lat;
-					lonMax = ne.lon; latMax = ne.lat;
+					lonMin = sw.lon;
+					latMin = sw.lat;
+					lonMax = ne.lon;
+					latMax = ne.lat;
 				}
 
 				// Тепер можна передати у TilesForViewportBBox
@@ -561,8 +623,8 @@ namespace AntennasCalculator.WpfApp
 			vm.DemScan.Clear();
 			foreach (var name in required)
 			{
-				string path = Path.Combine(vm.DemFolder, name + ".hgt");
-				bool exists = File.Exists(path);
+				var path = Path.Combine(vm.DemFolder, name + ".hgt");
+				var exists = File.Exists(path);
 
 				// На всякий випадок — перевіримо альтернативні регістри/іменування
 				if (!exists)
@@ -585,13 +647,9 @@ namespace AntennasCalculator.WpfApp
 			// Підказка в статусі
 			var missing = vm.DemScan.Where(t => !t.Exists).Select(t => t.Name).ToList();
 			if (missing.Count > 0)
-			{
 				StatusText.Text = $"Missing DEM tiles: {string.Join(", ", missing)}";
-			}
 			else
-			{
 				StatusText.Text = "All required DEM tiles are present.";
-			}
 		}
 
 
@@ -603,9 +661,13 @@ namespace AntennasCalculator.WpfApp
 				MessageBox.Show("Тека DEM Folder не задана або не існує.");
 				return;
 			}
+
 			try
 			{
-				Process.Start(new ProcessStartInfo(vm.DemFolder) { UseShellExecute = true });
+				Process.Start(new ProcessStartInfo(vm.DemFolder)
+				{
+					UseShellExecute = true
+				});
 			}
 			catch (Exception ex)
 			{
@@ -622,9 +684,10 @@ namespace AntennasCalculator.WpfApp
 				MessageBox.Show("Всі необхідні тайли присутні.");
 				return;
 			}
+
 			try
 			{
-				System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, missing));
+				Clipboard.SetText(string.Join(Environment.NewLine, missing));
 				MessageBox.Show("Перелік відсутніх тайлів скопійовано в буфер обміну.");
 			}
 			catch (Exception ex)
@@ -655,15 +718,17 @@ namespace AntennasCalculator.WpfApp
 				MessageBox.Show("Спочатку вкажіть коректний DEM Folder.");
 				return;
 			}
+
 			var missing = vm.DemScan.Where(t => !t.Exists).Select(t => t.Name).ToList();
 			if (missing.Count == 0)
 			{
 				MessageBox.Show("Всі необхідні тайли вже присутні.\\nНатисніть 'Scan required tiles' щоб оновити список.");
 				return;
 			}
+
 			try
 			{
-				var btn = sender as System.Windows.Controls.Button;
+				var btn = sender as Button;
 				if (btn is not null) btn.IsEnabled = false;
 				StatusText.Text = "Починаю завантаження відсутніх .hgt...";
 				var progress = new Progress<string>(s => StatusText.Text = s);
@@ -678,47 +743,50 @@ namespace AntennasCalculator.WpfApp
 			}
 			finally
 			{
-				var btn = sender as System.Windows.Controls.Button;
+				var btn = sender as Button;
 				if (btn is not null) btn.IsEnabled = true;
 			}
 		}
 
-		private IEnumerable<string> TilesForViewportBBox(double minLon, double minLat, double maxLon, double maxLat, int margin, bool forceDatelineWrap)
+		private IEnumerable<string> TilesForViewportBBox(double minLon, double minLat, double maxLon, double maxLat, int margin,
+			bool forceDatelineWrap)
 		{
 			// Normalize bounds
 			minLon = NormalizeLon(minLon);
 			maxLon = NormalizeLon(maxLon);
 			// Handle wrap
-			bool wrap = forceDatelineWrap;
+			var wrap = forceDatelineWrap;
 			if (!wrap)
 			{
-				double span = Math.Abs(maxLon - minLon);
+				var span = Math.Abs(maxLon - minLon);
 				wrap = span > 180;
 			}
+
 			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			int latStart = (int)Math.Floor(Math.Min(minLat, maxLat)) - margin;
-			int latEnd = (int)Math.Floor(Math.Max(minLat, maxLat)) + margin;
+			var latStart = (int)Math.Floor(Math.Min(minLat, maxLat)) - margin;
+			var latEnd = (int)Math.Floor(Math.Max(minLat, maxLat)) + margin;
 			if (!wrap)
 			{
-				int lonStart = (int)Math.Floor(Math.Min(minLon, maxLon)) - margin;
-				int lonEnd = (int)Math.Floor(Math.Max(minLon, maxLon)) + margin;
-				for (int lat = latStart; lat <= latEnd; lat++)
-					for (int lon = lonStart; lon <= lonEnd; lon++)
+				var lonStart = (int)Math.Floor(Math.Min(minLon, maxLon)) - margin;
+				var lonEnd = (int)Math.Floor(Math.Max(minLon, maxLon)) + margin;
+				for (var lat = latStart; lat <= latEnd; lat++)
+					for (var lon = lonStart; lon <= lonEnd; lon++)
 						set.Add(TileName(lat, lon));
 			}
 			else
 			{
 				// Split into two ranges across dateline
-				int lonStart1 = -180 - margin;
-				int lonEnd1 = (int)Math.Floor(Math.Min(minLon, maxLon)) + margin;
-				int lonStart2 = (int)Math.Floor(Math.Max(minLon, maxLon)) - margin;
-				int lonEnd2 = 179 + margin;
-				for (int lat = latStart; lat <= latEnd; lat++)
+				var lonStart1 = -180 - margin;
+				var lonEnd1 = (int)Math.Floor(Math.Min(minLon, maxLon)) + margin;
+				var lonStart2 = (int)Math.Floor(Math.Max(minLon, maxLon)) - margin;
+				var lonEnd2 = 179 + margin;
+				for (var lat = latStart; lat <= latEnd; lat++)
 				{
-					for (int lon = lonStart1; lon <= lonEnd1; lon++) set.Add(TileName(lat, lon));
-					for (int lon = lonStart2; lon <= lonEnd2; lon++) set.Add(TileName(lat, lon));
+					for (var lon = lonStart1; lon <= lonEnd1; lon++) set.Add(TileName(lat, lon));
+					for (var lon = lonStart2; lon <= lonEnd2; lon++) set.Add(TileName(lat, lon));
 				}
 			}
+
 			return set.OrderBy(s => s);
 		}
 	}

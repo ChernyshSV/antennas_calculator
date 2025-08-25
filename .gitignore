@@ -402,3 +402,5 @@ FodyWeavers.xsd
 *.patch
 
 dem files/
+
+.idea/.idea.AntennasCalculatorApp/.idea/

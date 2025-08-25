@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWPF>true</UseWPF>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Fresnel.Core\Fresnel.Core.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Mapsui.Wpf" Version="5.0.0-beta.20" />
-    <PackageReference Include="Mapsui.Nts" Version="5.0.0-beta.20" />
-    <PackageReference Include="NetTopologySuite" Version="2.6.0" />
-  </ItemGroup>
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net8.0-windows</TargetFramework>
+        <UseWPF>true</UseWPF>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\Fresnel.Core\Fresnel.Core.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Mapsui.Wpf" Version="5.0.0-beta.20"/>
+        <PackageReference Include="Mapsui.Nts" Version="5.0.0-beta.20"/>
+        <PackageReference Include="NetTopologySuite" Version="2.6.0"/>
+    </ItemGroup>
 </Project>
