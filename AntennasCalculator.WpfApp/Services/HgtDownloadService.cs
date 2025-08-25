@@ -153,15 +153,27 @@ public static class HgtDownloadService
 				ct.ThrowIfCancellationRequested();
 				try
 				{
-					progress?.Report($"Downloading bundle {bundle} ...");
-					using var resp = await http.GetAsync(url, ct).ConfigureAwait(false);
-					if (!resp.IsSuccessStatusCode) { continue; }
-					var tmpZip = Path.Combine(Path.GetTempPath(), $"{bundle}-{Guid.NewGuid():N}.zip");
-					await using (var fs = File.Create(tmpZip))
+					//progress?.Report($"Downloading bundle {bundle} ...");
+					//using var resp = await http.GetAsync(url, ct).ConfigureAwait(false);
+					//if (!resp.IsSuccessStatusCode) { continue; }
+					//var tmpZip = Path.Combine(Path.GetTempPath(), $"{bundle}-{Guid.NewGuid():N}.zip");
+					//await using (var fs = File.Create(tmpZip))
+					//{
+					//	await resp.Content.CopyToAsync(fs, ct).ConfigureAwait(false);
+					//}
+					//using (var za = ZipFile.OpenRead(tmpZip))
+					var localZip = Path.Combine(demFolder, $"{bundle}.zip");
+					if (!File.Exists(localZip))
 					{
-						await resp.Content.CopyToAsync(fs, ct).ConfigureAwait(false);
+						progress?.Report($"Downloading bundle {bundle} ...");
+						using var resp = await http.GetAsync(url, ct).ConfigureAwait(false);
+						if (!resp.IsSuccessStatusCode) { continue; }
+						await using (var fs = File.Create(localZip))
+						{
+							await resp.Content.CopyToAsync(fs, ct).ConfigureAwait(false);
+						}
 					}
-					using (var za = ZipFile.OpenRead(tmpZip))
+					using (var za = ZipFile.OpenRead(localZip))
 					{
 						foreach (var name in todo.ToList())
 						{
@@ -180,7 +192,7 @@ public static class HgtDownloadService
 							progress?.Report($"Saved {name}.hgt from {bundle}.zip");
 						}
 					}
-					try { File.Delete(tmpZip); } catch { /* ignore */ }
+					//try { File.Delete(tmpZip); } catch { /* ignore */ }
 					okBundle = true;
 					break;
 				}

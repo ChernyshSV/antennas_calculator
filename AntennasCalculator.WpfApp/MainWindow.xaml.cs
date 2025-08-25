@@ -437,56 +437,54 @@ namespace AntennasCalculator.WpfApp
 			return lon;
 		}
 
-		private IEnumerable<string> TilesForSegment((double lat, double lon) a, (double lat, double lon) b, int margin, bool forceDatelineWrap)
+		private IEnumerable<string> TilesForSegment(
+	(double lat, double lon) a,
+	(double lat, double lon) b,
+	int margin,
+	bool forceDatelineWrap)
 		{
-			//// basic bbox-based coverage; not handling dateline wrap (assume short links)
-			//double minLat = Math.Min(a.lat, b.lat);
-			//double maxLat = Math.Max(a.lat, b.lat);
-			//double minLon = Math.Min(a.lon, b.lon);
-			//double maxLon = Math.Max(a.lon, b.lon);
-			//int latStart = (int)Math.Floor(minLat) - margin;
-			//int latEnd = (int)Math.Floor(maxLat) + margin;
-			//int lonStart = (int)Math.Floor(minLon) - margin;
-			//int lonEnd = (int)Math.Floor(maxLon) + margin;
-
 			// bbox-based coverage with dateline handling
 			double aLon = NormalizeLon(a.lon);
 			double bLon = NormalizeLon(b.lon);
 			double minLat = Math.Min(a.lat, b.lat);
 			double maxLat = Math.Max(a.lat, b.lat);
 
-			// Choose whether bbox crosses dateline
+			// Decide if bbox crosses the dateline
 			bool wrap = forceDatelineWrap;
 			if (!wrap)
 			{
 				double span = Math.Abs(aLon - bLon);
 				wrap = span > 180; // auto-detect crossing
 			}
+
 			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-			//for (int lat = latStart; lat <= latEnd; lat++)
-			//	for (int lon = lonStart; lon <= lonEnd; lon++)
-			//		set.Add(TileName(lat, lon));
+
 			int latStart = (int)Math.Floor(minLat) - margin;
 			int latEnd = (int)Math.Floor(maxLat) + margin;
+
 			if (!wrap)
 			{
 				double minLon = Math.Min(aLon, bLon);
 				double maxLon = Math.Max(aLon, bLon);
 				int lonStart = (int)Math.Floor(minLon) - margin;
 				int lonEnd = (int)Math.Floor(maxLon) + margin;
+
 				for (int lat = latStart; lat <= latEnd; lat++)
 					for (int lon = lonStart; lon <= lonEnd; lon++)
 						set.Add(TileName(lat, lon));
 			}
 			else
 			{
-				// Two intervals: [-180..min] and [max..180)
+				// Split into two longitude ranges across the dateline
 				double minLon = Math.Min(aLon, bLon);
 				double maxLon = Math.Max(aLon, bLon);
+
 				int lonStart1 = -180 - margin;
 				int lonEnd1 = (int)Math.Floor(minLon) + margin;
+
 				int lonStart2 = (int)Math.Floor(maxLon) - margin;
 				int lonEnd2 = 179 + margin;
+
 				for (int lat = latStart; lat <= latEnd; lat++)
 				{
 					for (int lon = lonStart1; lon <= lonEnd1; lon++)
@@ -495,8 +493,10 @@ namespace AntennasCalculator.WpfApp
 						set.Add(TileName(lat, lon));
 				}
 			}
+
 			return set.OrderBy(s => s);
 		}
+
 
 		private IEnumerable<string> TilesAround((double lat, double lon) c, int radius = 1)
 		{
@@ -519,41 +519,70 @@ namespace AntennasCalculator.WpfApp
 			}
 
 			IEnumerable<string> required;
+
 			if (_p1 is not null && _p2 is not null)
 			{
-				required = TilesForSegment((_p1.LatitudeDeg, _p1.LongitudeDeg),
-										   (_p2.LatitudeDeg, _p2.LongitudeDeg),
-										   margin: 0, true);
+				// За обраними кінцями лінку (bbox з margin та підтримкою даталайн)
+				required = TilesForSegment(
+					(_p1.LatitudeDeg, _p1.LongitudeDeg),
+					(_p2.LatitudeDeg, _p2.LongitudeDeg),
+					vm.DemScanMargin,
+					vm.ForceDatelineWrap);
 			}
 			else
 			{
-				var viewport = MapCtrl.Map.Navigator.Viewport;
-				
-				var lonlat = SphericalMercator.ToLonLat(viewport.CenterX, viewport.CenterY);
+				// За поточним екранним екстентом (viewport bbox), а не 3x3 від центру
+				var viewport = MapCtrl.Map?.Navigator?.Viewport;
+				double lonMin = 0, latMin = 0, lonMax = 0, latMax = 0;
 
-				required = TilesAround((lonlat.lat, lonlat.lon), radius: 1);
+				if (viewport is not null)
+				{
+					// Координати в SphericalMercator (метри)
+					double left = viewport.Value.CenterX - viewport.Value.Width / 2;
+					double right = viewport.Value.CenterX + viewport.Value.Width / 2;
+					double bottom = viewport.Value.CenterY - viewport.Value.Height / 2;
+					double top = viewport.Value.CenterY + viewport.Value.Height / 2;
+
+					// Конвертація в географічні координати
+					var sw = SphericalMercator.ToLonLat(left, bottom); // південно-західний кут
+					var ne = SphericalMercator.ToLonLat(right, top);    // північно-східний кут
+
+					lonMin = sw.lon; latMin = sw.lat;
+					lonMax = ne.lon; latMax = ne.lat;
+				}
+
+				// Тепер можна передати у TilesForViewportBBox
+				required = TilesForViewportBBox(
+					lonMin, latMin, lonMax, latMax,
+					vm.DemScanMargin,
+					vm.ForceDatelineWrap);
 			}
 
 			vm.DemScan.Clear();
 			foreach (var name in required)
 			{
-				//var files = Directory.GetFiles(vm.DemFolder, "")
-
 				string path = Path.Combine(vm.DemFolder, name + ".hgt");
 				bool exists = File.Exists(path);
+
+				// На всякий випадок — перевіримо альтернативні регістри/іменування
 				if (!exists)
 				{
-					// Try lowercase/uppercase variants (Windows ignores, but just in case cross-platform)
 					var alt = Directory.GetFiles(vm.DemFolder, name + ".hgt", SearchOption.AllDirectories)
 						.Concat(Directory.GetFiles(vm.DemFolder, name + ".HGT", SearchOption.AllDirectories))
 						.FirstOrDefault();
-					if (!string.IsNullOrEmpty(alt)) { path = alt; exists = true; }
+					if (!string.IsNullOrEmpty(alt))
+					{
+						path = alt;
+						exists = true;
+					}
 				}
+
 				vm.DemScan.Add(new DemTileStatus(name, exists, exists ? path : null));
 			}
+
 			vm.UpdateDemScanSummary();
 
-			// Quick hint if something is missing
+			// Підказка в статусі
 			var missing = vm.DemScan.Where(t => !t.Exists).Select(t => t.Name).ToList();
 			if (missing.Count > 0)
 			{
@@ -564,6 +593,7 @@ namespace AntennasCalculator.WpfApp
 				StatusText.Text = "All required DEM tiles are present.";
 			}
 		}
+
 
 		private void OpenDemFolder_Click(object sender, RoutedEventArgs e)
 		{
@@ -651,6 +681,45 @@ namespace AntennasCalculator.WpfApp
 				var btn = sender as System.Windows.Controls.Button;
 				if (btn is not null) btn.IsEnabled = true;
 			}
+		}
+
+		private IEnumerable<string> TilesForViewportBBox(double minLon, double minLat, double maxLon, double maxLat, int margin, bool forceDatelineWrap)
+		{
+			// Normalize bounds
+			minLon = NormalizeLon(minLon);
+			maxLon = NormalizeLon(maxLon);
+			// Handle wrap
+			bool wrap = forceDatelineWrap;
+			if (!wrap)
+			{
+				double span = Math.Abs(maxLon - minLon);
+				wrap = span > 180;
+			}
+			var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			int latStart = (int)Math.Floor(Math.Min(minLat, maxLat)) - margin;
+			int latEnd = (int)Math.Floor(Math.Max(minLat, maxLat)) + margin;
+			if (!wrap)
+			{
+				int lonStart = (int)Math.Floor(Math.Min(minLon, maxLon)) - margin;
+				int lonEnd = (int)Math.Floor(Math.Max(minLon, maxLon)) + margin;
+				for (int lat = latStart; lat <= latEnd; lat++)
+					for (int lon = lonStart; lon <= lonEnd; lon++)
+						set.Add(TileName(lat, lon));
+			}
+			else
+			{
+				// Split into two ranges across dateline
+				int lonStart1 = -180 - margin;
+				int lonEnd1 = (int)Math.Floor(Math.Min(minLon, maxLon)) + margin;
+				int lonStart2 = (int)Math.Floor(Math.Max(minLon, maxLon)) - margin;
+				int lonEnd2 = 179 + margin;
+				for (int lat = latStart; lat <= latEnd; lat++)
+				{
+					for (int lon = lonStart1; lon <= lonEnd1; lon++) set.Add(TileName(lat, lon));
+					for (int lon = lonStart2; lon <= lonEnd2; lon++) set.Add(TileName(lat, lon));
+				}
+			}
+			return set.OrderBy(s => s);
 		}
 	}
 }
