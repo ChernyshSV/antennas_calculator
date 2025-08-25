@@ -637,7 +637,7 @@ namespace AntennasCalculator.WpfApp
 				if (btn is not null) btn.IsEnabled = false;
 				StatusText.Text = "Починаю завантаження відсутніх .hgt...";
 				var progress = new Progress<string>(s => StatusText.Text = s);
-				var ok = await HgtDownloadService.DownloadMissingAsync(missing, vm.DemFolder, progress);
+				var ok = await HgtDownloadService.DownloadMissingFromBundlesAsync(missing, vm.DemFolder, progress);
 				// Re-scan the folder to refresh statuses
 				ScanDemTiles_Click(sender, e);
 				MessageBox.Show($"Завантажено: {ok.Count} з {missing.Count} тайлів.");

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Net;
 
 namespace AntennasCalculator.WpfApp.Services;
 
@@ -108,4 +109,126 @@ public static class HgtDownloadService
 		}
 		return ok;
 	}
+
+	/// <summary>
+	/// Attempt to download required tiles using Viewfinder Panoramas bundle zips like 'L36.zip' which contain multiple .hgt.
+	/// We infer a bundle name from each tile (NxxEyyy etc.), group by bundle, and download once per bundle.
+	/// </summary>
+	public static async Task<IReadOnlyList<string>> DownloadMissingFromBundlesAsync(IEnumerable<string> missingTileNames, string demFolder, IProgress<string>? progress = null, CancellationToken ct = default)
+	{
+		Directory.CreateDirectory(demFolder);
+		var remaining = new HashSet<string>(missingTileNames, StringComparer.OrdinalIgnoreCase);
+		var saved = new List<string>();
+
+		// Group missing tiles by inferred bundle code
+		var byBundle = remaining
+			.Select(name => (name, bundle: InferBundleForTile(name)))
+			.Where(x => x.bundle is not null)
+			.GroupBy(x => x.bundle!)
+			.ToDictionary(g => g.Key, g => g.Select(x => x.name).ToList(), StringComparer.OrdinalIgnoreCase);
+
+		if (byBundle.Count == 0) return Array.Empty<string>();
+
+		using var http = new HttpClient(new HttpClientHandler
+		{
+			AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+		});
+		http.Timeout = TimeSpan.FromSeconds(90);
+
+		foreach (var (bundle, names) in byBundle)
+		{
+			// Skip if all names already present
+			var todo = names.Where(n => !File.Exists(Path.Combine(demFolder, n + ".hgt"))).ToList();
+			if (todo.Count == 0) continue;
+
+			// Try HTTPS then HTTP
+			var urls = new[] {
+				$"https://viewfinderpanoramas.org/dem3/{bundle}.zip",
+				//$"http://viewfinderpanoramas.org/dem3/{bundle}.zip"
+			};
+
+			bool okBundle = false;
+			foreach (var url in urls)
+			{
+				ct.ThrowIfCancellationRequested();
+				try
+				{
+					progress?.Report($"Downloading bundle {bundle} ...");
+					using var resp = await http.GetAsync(url, ct).ConfigureAwait(false);
+					if (!resp.IsSuccessStatusCode) { continue; }
+					var tmpZip = Path.Combine(Path.GetTempPath(), $"{bundle}-{Guid.NewGuid():N}.zip");
+					await using (var fs = File.Create(tmpZip))
+					{
+						await resp.Content.CopyToAsync(fs, ct).ConfigureAwait(false);
+					}
+					using (var za = ZipFile.OpenRead(tmpZip))
+					{
+						foreach (var name in todo.ToList())
+						{
+							var entry = za.Entries.FirstOrDefault(e =>
+								e.FullName.EndsWith(".hgt", StringComparison.OrdinalIgnoreCase) &&
+								Path.GetFileNameWithoutExtension(e.FullName)
+									.Equals(name, StringComparison.OrdinalIgnoreCase));
+							if (entry is null) continue;
+							var dest = Path.Combine(demFolder, name + ".hgt");
+							await using var es = entry.Open();
+							await using var outFs = File.Create(dest);
+							await es.CopyToAsync(outFs, ct).ConfigureAwait(false);
+							saved.Add(name);
+							remaining.Remove(name);
+							todo.Remove(name);
+							progress?.Report($"Saved {name}.hgt from {bundle}.zip");
+						}
+					}
+					try { File.Delete(tmpZip); } catch { /* ignore */ }
+					okBundle = true;
+					break;
+				}
+				catch
+				{
+					// try the next URL
+				}
+			}
+			if (!okBundle)
+			{
+				progress?.Report($"Failed to download bundle {bundle}.zip");
+			}
+		}
+
+		return saved;
+	}
+
+	/// <summary>
+	/// Heuristic inference of Viewfinder Panoramas bundle code like 'L36' from an HGT tile name 'N48E031'/'S10W123'.
+	/// The scheme groups longitudes by 6° (number = group+6). Latitude is grouped in 4° bands ('A' + floor(lat/4) for N; S is clamped to 0).
+	/// Works well for mid-latitudes in the Northern Hemisphere (e.g., Europe, incl. Ukraine).
+	/// </summary>
+	public static string? InferBundleForTile(string tileName)
+	{
+		if (string.IsNullOrWhiteSpace(tileName) || tileName.Length < 7) return null;
+		try
+		{
+			// Parse N/Sxx E/Wxxx
+			char ns = tileName[0];
+			int lat = int.Parse(tileName.Substring(1, 2));
+			char ew = tileName[3];
+			int lon = int.Parse(tileName.Substring(4));
+
+			// Longitude group of 6 degrees, bundle number = group + 6
+			int lonGroup = (int)Math.Floor(lon / 6.0) * 6;
+			int number = lonGroup + 6;
+
+			// Latitude 4-degree bands; for Southern hemisphere clamp to 0 for our simple mapping
+			int latAbs = lat;
+			int bandIndex = (int)Math.Floor(latAbs / 4.0);
+			char letter = (char)('A' + Math.Max(0, bandIndex));
+			return $"{letter}{number}";
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+
 }
