@@ -20,6 +20,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Navigation;
 using Point = NetTopologySuite.Geometries.Point;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AntennasCalculator.WpfApp
 {
@@ -125,6 +126,12 @@ namespace AntennasCalculator.WpfApp
 			vm.ApHeightM = s.ApHeightM;
 			vm.StaHeightM = s.StaHeightM;
 			vm.DemFolder = s.DemFolder ?? string.Empty;
+			vm.KFactor = s.KFactor;
+			vm.TxPowerApDbm = s.TxPowerApDbm;
+			vm.TxPowerStaDbm = s.TxPowerStaDbm;
+			vm.FeedLossApDb = s.FeedLossApDb;
+			vm.FeedLossStaDb = s.FeedLossStaDb;
+			vm.OtherLossesDb = s.OtherLossesDb;
 
 			// Resolve antennas by Code first, then Brand+Model
 			if (vm.AntennaCatalog.Count > 0)
@@ -166,6 +173,12 @@ namespace AntennasCalculator.WpfApp
 				ApHeightM = vm.ApHeightM,
 				StaHeightM = vm.StaHeightM,
 				DemFolder = string.IsNullOrWhiteSpace(vm.DemFolder) ? null : vm.DemFolder,
+				KFactor = vm.KFactor,
+				TxPowerApDbm = vm.TxPowerApDbm,
+				TxPowerStaDbm = vm.TxPowerStaDbm,
+				FeedLossApDb = vm.FeedLossApDb,
+				FeedLossStaDb = vm.FeedLossStaDb,
+				OtherLossesDb = vm.OtherLossesDb,
 				ApAntennaCode = vm.SelectedApAntenna?.Code,
 				ApAntennaBrand = vm.SelectedApAntenna?.Brand,
 				ApAntennaModel = vm.SelectedApAntenna?.Model,
@@ -389,10 +402,17 @@ namespace AntennasCalculator.WpfApp
 				var d1i = dist * t;
 				var d2i = dist - d1i;
 				var r1i = _fresnel.Radius1(freqHz, d1i, d2i);
-				var ground = dem.GetElevation(
+				var groundBare = dem.GetElevation(
 					_p1.LatitudeDeg + (_p2.LatitudeDeg - _p1.LatitudeDeg) * t,
 					_p1.LongitudeDeg + (_p2.LongitudeDeg - _p1.LongitudeDeg) * t);
-				var losZi = zA + (zB - zA) * t; // straight line between endpoints
+				//var losZi = zA + (zB - zA) * t; // straight line between endpoints
+				//var clearanceMeters = losZi - ground;
+				// Effective Earth curvature with k-factor
+				double Re = 6371000.0 * vm.KFactor; // effective Earth radius
+				double bulge = d1i * d2i / (2 * Re); // meters
+				var ground = groundBare + bulge;
+
+				var losZi = zA + (zB - zA) * t; // straight line
 				var clearanceMeters = losZi - ground;
 				var pct = r1i > 0 ? clearanceMeters / r1i * 100.0 : 0;
 				if (pct < minPct) minPct = pct;
@@ -405,6 +425,57 @@ namespace AntennasCalculator.WpfApp
 			UpdateLosIndicator(minPct);
 
 			HighlightViolationSegments(dem, dist, freqHz, vm, samples);
+
+			// Compute knife-edge diffraction (single worst obstruction) and link budget
+			ComputeKnifeEdgeAndBudget(dem, dist, freqHz, vm, samples, zA, zB);
+		}
+
+		private void ComputeKnifeEdgeAndBudget(IDemProvider dem, double dist, double freqHz, LinkViewModel vm, int samples, double zA, double zB)
+		{
+			// Knife-edge: find point with max v parameter above LOS
+			// v = h * sqrt( (2/λ) * (d1 + d2) / (d1*d2) )
+			double lambda = 299792458.0 / freqHz;
+			double vMax = double.NegativeInfinity;
+			for (int i = 1; i < samples; i++)
+			{
+				double t = i / (double)samples;
+				double d1 = dist * t;
+				double d2 = dist - d1;
+				var losZi = zA + (zB - zA) * t;
+				var terr = dem.GetElevation(
+					_p1!.LatitudeDeg + (_p2!.LatitudeDeg - _p1!.LatitudeDeg) * t,
+					_p1!.LongitudeDeg + (_p2!.LongitudeDeg - _p1!.LongitudeDeg) * t);
+
+				// Add Earth bulge with k-factor to terrain
+				double Re = 6371000.0 * vm.KFactor;
+				double bulge = d1 * d2 / (2 * Re);
+				terr += bulge;
+
+				double h = terr - losZi; // positive if terrain above LOS at that point
+				if (h <= 0) continue;
+				double v = h * Math.Sqrt((2.0 / lambda) * ((d1 + d2) / (d1 * d2)));
+				if (v > vMax) vMax = v;
+			}
+
+			double Ld = 0.0;
+			if (!double.IsNegativeInfinity(vMax) && vMax > -0.78)
+			{
+				// ITU-R knife-edge approximation
+				Ld = 6.9 + 20.0 * Math.Log10(Math.Sqrt(Math.Pow(vMax - 0.1, 2) + 1) + vMax - 0.1);
+			}
+			vm.KnifeEdgeLossDb = Ld;
+
+			// Basic link budget (one-way): AP -> STA
+			double dKm = dist / 1000.0;
+			double fGHz = vm.FreqGHz;
+			double fspl = 92.45 + 20.0 * Math.Log10(fGHz) + 20.0 * Math.Log10(Math.Max(0.001, dKm));
+			double eirpAp = vm.TxPowerApDbm + (vm.SelectedApAntenna?.Gain_dBi ?? vm.ApGainDbi) - vm.FeedLossApDb;
+			double grxSta = (vm.SelectedStaAntenna?.Gain_dBi ?? vm.StaGainDbi) - vm.FeedLossStaDb;
+			double prx = eirpAp + grxSta - fspl - vm.OtherLossesDb - Ld;
+			vm.PrxDbm = prx;
+
+			// Show result in status tail
+			StatusText.Text += $" | FSPL={fspl:0.0} dB, Ld(knife)={Ld:0.0} dB, Prx≈{prx:0.0} dBm";
 		}
 
 		private void HighlightViolationSegments(IDemProvider dem, double dist, double freqHz, LinkViewModel vm, int samples)

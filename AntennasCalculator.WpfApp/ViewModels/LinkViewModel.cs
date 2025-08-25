@@ -16,6 +16,19 @@ namespace AntennasCalculator.WpfApp.ViewModels
 		private int _demScanMargin; // tiles padding around bbox
 		private string _demScanSummary = string.Empty;
 		private bool _forceDatelineWrap;
+
+		// Radio physics
+		private double _kFactor = 1.333; // 4/3 Earth by default
+		private double _knifeEdgeLossDb = 0.0;
+
+		// Link budget
+		private double _txPowerApDbm = 20.0;
+		private double _txPowerStaDbm = 20.0;
+		private double _feedLossApDb = 1.0;
+		private double _feedLossStaDb = 1.0;
+		private double _otherLossesDb = 0.0;
+		private double _prxDbm = 0.0;
+
 		private double _freqGHz = 5.5;
 		private double _minClearancePctActual;
 		private string _profileMode = "Precise"; // "Precise" or "Coarse"
@@ -39,6 +52,55 @@ namespace AntennasCalculator.WpfApp.ViewModels
 				}
 			}
 		}
+
+		public double KFactor
+		{
+			get => _kFactor;
+			set { if (Math.Abs(_kFactor - value) > 1e-9) { _kFactor = value; OnPropertyChanged(); } }
+		}
+
+		public double KnifeEdgeLossDb
+		{
+			get => _knifeEdgeLossDb;
+			set { if (Math.Abs(_knifeEdgeLossDb - value) > 1e-9) { _knifeEdgeLossDb = value; OnPropertyChanged(); } }
+		}
+
+		public double TxPowerApDbm
+		{
+			get => _txPowerApDbm;
+			set { if (Math.Abs(_txPowerApDbm - value) > 1e-9) { _txPowerApDbm = value; OnPropertyChanged(); } }
+		}
+
+		public double TxPowerStaDbm
+		{
+			get => _txPowerStaDbm;
+			set { if (Math.Abs(_txPowerStaDbm - value) > 1e-9) { _txPowerStaDbm = value; OnPropertyChanged(); } }
+		}
+
+		public double FeedLossApDb
+		{
+			get => _feedLossApDb;
+			set { if (Math.Abs(_feedLossApDb - value) > 1e-9) { _feedLossApDb = value; OnPropertyChanged(); } }
+		}
+
+		public double FeedLossStaDb
+		{
+			get => _feedLossStaDb;
+			set { if (Math.Abs(_feedLossStaDb - value) > 1e-9) { _feedLossStaDb = value; OnPropertyChanged(); } }
+		}
+
+		public double OtherLossesDb
+		{
+			get => _otherLossesDb;
+			set { if (Math.Abs(_otherLossesDb - value) > 1e-9) { _otherLossesDb = value; OnPropertyChanged(); } }
+		}
+
+		public double PrxDbm
+		{
+			get => _prxDbm;
+			set { if (Math.Abs(_prxDbm - value) > 1e-9) { _prxDbm = value; OnPropertyChanged(); } }
+		}
+
 
 		public int DemScanMargin
 		{

@@ -7,6 +7,12 @@
 		public string Band { get; set; } = "5 GHz";
 		public string Technology { get; set; } = "AirMax";
 		public int ChannelWidthMHz { get; set; } = 40;
+		public double KFactor { get; set; } = 1.333;
+		public double TxPowerApDbm { get; set; } = 20.0;
+		public double TxPowerStaDbm { get; set; } = 20.0;
+		public double FeedLossApDb { get; set; } = 1.0;
+		public double FeedLossStaDb { get; set; } = 1.0;
+		public double OtherLossesDb { get; set; } = 0.0;
 
 		public double ApHeightM { get; set; } = 10;
 		public double StaHeightM { get; set; } = 10;

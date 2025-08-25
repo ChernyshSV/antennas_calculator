@@ -282,6 +282,63 @@
                                        Margin="12,0,0,0"
                                        VerticalAlignment="Center" />
                         </StackPanel>
+
+                        <!-- Radio physics -->
+                        <GroupBox Header="Radio/Physics"
+                                  Margin="0,8,0,0">
+                            <UniformGrid Columns="4"
+                                         Margin="8">
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,8,0">
+                                    <TextBlock Text="k-factor:"
+                                               Width="90"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="80"
+                                             Text="{Binding KFactor, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,8,0">
+                                    <TextBlock Text="Tx AP (dBm):"
+                                               Width="90"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="80"
+                                             Text="{Binding TxPowerApDbm, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,8,0">
+                                    <TextBlock Text="Tx STA (dBm):"
+                                               Width="90"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="80"
+                                             Text="{Binding TxPowerStaDbm, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,8,0">
+                                    <TextBlock Text="Other losses (dB):"
+                                               Width="110"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="80"
+                                             Text="{Binding OtherLossesDb, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,8,0">
+                                    <TextBlock Text="Feed AP (dB):"
+                                               Width="90"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="80"
+                                             Text="{Binding FeedLossApDb, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,0,8,0">
+                                    <TextBlock Text="Feed STA (dB):"
+                                               Width="90"
+                                               VerticalAlignment="Center" />
+                                    <TextBox Width="80"
+                                             Text="{Binding FeedLossStaDb, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </UniformGrid>
+                        </GroupBox>
+
                         <TextBlock Margin="12,0,0,0"
                                    VerticalAlignment="Center">
                             <Run Text="Min actual clearance: " />
